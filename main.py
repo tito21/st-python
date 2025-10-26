@@ -34,6 +34,7 @@ def get_settings(params_path):
                 "num_lines": 10000,
                 "length_lines": 100.0,
                 "min_length": 10.0,
+                'color_threshold': 50
             }
         ]
     else:

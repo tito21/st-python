@@ -25,11 +25,11 @@ algorithm. It should be a JSON file with the following structure:
 ```yaml
 [
     { // First layer
-         "sigma": float,               // Standard deviation for Gaussian smoothing
-         "length_lines": float,        // Maximum length of lines in this layer
-         "width": float,               // Width of lines in this layer
-         "min_length": float,          // Minimum length of lines to draw
-         "color_threshold": int        // Minimum color difference to draw a line
+         "sigma": 1.0,               // Standard deviation for Gaussian smoothing
+         "length_lines": 10000.0,    // Maximum length of lines in this layer
+         "width": 2.0,               // Width of lines in this layer
+         "min_length": 10.0,         // Minimum length of lines to draw
+         "color_threshold": 50.0     // Minimum color difference to draw a line
     },
     { // Second layer
         ...

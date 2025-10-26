@@ -43,3 +43,24 @@ The `orientation-vector` argument specifies how to compute the orientation. If
 `gradient` it uses the image gradient (for reference).
 
 The settings used in the preprint can be found in `test-images/params.json`.
+
+## Reproducibility
+
+To reproduce the results in the preprint, run the following commands:
+
+```bash
+
+# Fig 1
+uv run main.py test-images/cubain.jpg out_cubain.png --params test-images/params.json --orientation-vector structural
+
+# Fig 3
+uv run main.py test-images/picasso.jpg picasso_st.png --params test-images/params_st_vs_gt.json --orientation-vector structural
+uv run main.py test-images/picasso.jpg picasso_gt.png --params test-images/params_st_vs_gt.json --orientation-vector gradient
+
+# Stylization of all images in the test datasets (Figures 4-11)
+cd test-images
+bash run_all.sh # MacOS/Linux
+& run_all.ps1 # Windows PowerShell
+bash make_montage.sh # MacOS/Linux (requires ImageMagick)
+
+```

@@ -11,3 +11,8 @@ wheels/
 
 # vs code settings
 .vscode/
+
+test-data/*
+test_*.py
+out*.png
+*.c

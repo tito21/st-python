@@ -1,0 +1,35 @@
+[
+    {
+        "sigma": 10.0,
+        "num_lines": 500,
+        "length_lines": 1000.0,
+        "width": 50.0,
+        "min_length": 50.0,
+        "color_threshold": 100
+    },
+    {
+        "sigma": 5.0,
+        "num_lines": 500,
+        "length_lines": 500.0,
+        "width": 25.0,
+        "min_length": 50.0,
+        "color_threshold": 100
+    },
+    {
+        "sigma": 1.0,
+        "num_lines": 500,
+        "length_lines": 100.0,
+        "width": 5.0,
+        "min_length": 10.0,
+        "color_threshold": 50
+    },
+    {
+        "sigma": 0.5,
+        "num_lines": 500,
+        "length_lines": 100.0,
+        "width": 2.5,
+        "min_length": 10.0,
+        "color_threshold": 50
+    }
+
+]

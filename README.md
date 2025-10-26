@@ -1,8 +1,8 @@
 # Stylization of Photographs using Tractography
 
 <div align="center">
-  <img src="test-images/cubain.jpg" alt="Original Image" width="600"/>
-  <img src="test-images/out_cubain.png" alt="Stylized Image" width="600"/>
+  <img src="test-images/cubain.jpg" alt="Original Image" width="350"/>
+  <img src="test-images/out_cubain.png" alt="Stylized Image" width="350"/>
 </div>
 
 <br/>

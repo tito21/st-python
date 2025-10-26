@@ -22,7 +22,7 @@ uv run main.py INPUT_IMAGE OUTPUT_IMAGE [--params PARAMS_JSON] [--orientation-ve
 The optional `PARAMS_JSON` file can be used to specify parameters for the
 algorithm. It should be a JSON file with the following structure:
 
-```json
+```yaml
 [
     { // First layer
          "sigma": float,               // Standard deviation for Gaussian smoothing

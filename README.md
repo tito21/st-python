@@ -58,6 +58,8 @@ uv run main.py test-images/picasso.jpg picasso_st.png --params test-images/param
 uv run main.py test-images/picasso.jpg picasso_gt.png --params test-images/params_st_vs_gt.json --orientation-vector gradient
 
 # Stylization of all images in the test datasets (Figures 4-11)
+source .venv/bin/activate  # MacOS/Linux
+& .\.venv\Scripts\Activate.ps1  # Windows PowerShell
 cd test-images
 bash run_all.sh # MacOS/Linux
 & run_all.ps1 # Windows PowerShell

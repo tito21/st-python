@@ -9,7 +9,7 @@
 Using the concepts from diffusion tensor imaging (DTI) and image processing,
 this project aims to stylize photographs in painterly style.
 
-For details, read the preprint [here](place/holder).
+For details, read the preprint [here](https://arxiv.org/abs/2511.00702v1).
 
 ## Usage
 

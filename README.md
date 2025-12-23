@@ -16,7 +16,11 @@ For details, read the preprint [here](https://arxiv.org/abs/2511.00702v1).
 Install [uv](https://docs.astral.sh/uv/) and run:
 
 ```bash
-uv run main.py INPUT_IMAGE OUTPUT_IMAGE [--params PARAMS_JSON] [--orientation-vector {structural,gradient}]
+uv run main.py INPUT_IMAGE OUTPUT_IMAGE [--params PARAMS_JSON] \
+                                        [--orientation-vector {structural,gradient}] \
+                                        [--rho RHO] [--sigma SIGMA] \
+                                        [--brush {simple,angle,img,line}] \
+                                        [--brush-img BRUSH_IMG]
 ```
 
 The optional `PARAMS_JSON` file can be used to specify parameters for the
@@ -38,11 +42,16 @@ algorithm. It should be a JSON file with the following structure:
 ]
 ```
 
-The `orientation-vector` argument specifies how to compute the orientation. If
-`structural` it uses the primary eigenvector of the structure tensor (proposed improvement), if
-`gradient` it uses the image gradient (for reference).
-
 The settings used in the preprint can be found in `test-images/params.json`.
+
+The `orientation-vector` argument specifies how to compute the orientation. If `structural` it uses the primary
+eigenvector of the structure tensor (proposed improvement), if `gradient` it uses the image gradient (for reference).
+For the structural tensor you can also specify the `rho` and `sigma` parameters (default 1.0) which control the scale of
+the tensor computation.
+
+Since the preprint support for different brush types has been added. You can choose between `simple` (default), `angle`,
+`img`, and `line`. The `brush-img` argument can be used to provide a custom brush image when using the `img` brush type.
+
 
 ## Reproducibility
 

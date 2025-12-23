@@ -10,7 +10,7 @@ from skimage.filters import gaussian
 import cairo
 import tqdm.auto as tqdm
 
-from draw import draw_tracts, simple_brush, angle_brush
+from draw import draw_tracts, simple_brush, angle_brush, img_brush, line_brush
 from tractography import *
 
 
@@ -20,8 +20,39 @@ def parse_args():
     )
     parser.add_argument("path", type=pathlib.Path, help="Path to the input image")
     parser.add_argument("output", type=pathlib.Path, help="Path to the output image")
-    parser.add_argument("--params", type=pathlib.Path, default=None, help="Path to the parameters file")
-    parser.add_argument("--orientation-vector", default="structural", choices=["structural", "gradient"], help="Orientation vector to use")
+    parser.add_argument(
+        "--params", type=pathlib.Path, default=None, help="Path to the parameters file"
+    )
+    parser.add_argument(
+        "--orientation-vector",
+        default="structural",
+        choices=["structural", "gradient"],
+        help="Orientation vector to use",
+    )
+    parser.add_argument(
+        "--rho",
+        type=float,
+        default=1.0,
+        help="Standard deviation of the avenging gaussian filter for the structural tensor",
+    )
+    parser.add_argument(
+        "--sigma",
+        type=float,
+        default=1.0,
+        help="Standard deviation of the derivative of gaussian filter for the structural tensor",
+    )
+    parser.add_argument(
+        "--brush",
+        default="simple",
+        choices=["simple", "angle", "img", "line"],
+        help="Brush type to use",
+    )
+    parser.add_argument(
+        "--brush-img",
+        type=pathlib.Path,
+        default=None,
+        help="Path to the brush image (only for img brush)",
+    )
     return parser.parse_args()
 
 
@@ -34,13 +65,34 @@ def get_settings(params_path):
                 "num_lines": 10000,
                 "length_lines": 100.0,
                 "min_length": 10.0,
-                'color_threshold': 50
+                "color_threshold": 50,
             }
         ]
     else:
         with open(params_path, "r") as f:
             settings = json.load(f)
         return settings
+
+
+def get_brush(brush_type, width, brush_img_path):
+    match brush_type:
+        case "simple":
+            brush = partial(simple_brush, width=width)
+        case "angle":
+            brush = partial(
+                angle_brush,
+                width=width,
+                line_width=width / 10,
+                num_segments=5,
+                scale=0.75,
+            )
+        case "img":
+            brush_image = io.imread(brush_img_path)
+            brush_image = brush_image.astype(np.float32) / 255.0
+            brush = partial(img_brush, width=width, image=brush_image)
+        case "line":
+            brush = partial(line_brush, width=width, num_segments=15)
+    return brush
 
 
 def render(
@@ -82,9 +134,8 @@ def render_grid(
     length_lines=1000.0,
     min_length=1.0,
     width=2.0,
+    brush=None,
 ):
-    # brush = partial(angle_brush, width=width, line_width=width / 10, num_segments=5, scale=0.75)
-    brush = partial(simple_brush, width=width)
     start_points = [
         (i, j)
         for i in range(0, image.shape[0], grid_size)
@@ -92,6 +143,18 @@ def render_grid(
     ]
     random.shuffle(start_points)
     for start_point in tqdm.tqdm(start_points):
+        # start_point = (
+        #     np.clip(
+        #         start_point[0] + np.random.randint(0, grid_size // 2),
+        #         grid_size // 2,
+        #         image.shape[0] - grid_size // 2,
+        #     ),
+        #     np.clip(
+        #         start_point[1] + np.random.randint(0, grid_size // 2),
+        #         grid_size // 2,
+        #         image.shape[1] - grid_size // 2,
+        #     ),
+        # )
         ode_system = ODESystem(orientation, valid_mask, mask_threshold)
         image_region = image[
             start_point[0] - grid_size // 2 : start_point[0] + grid_size // 2,
@@ -118,8 +181,21 @@ def render_grid(
             np.linalg.norm(image_region - target_region, axis=-1)
         )
         if color_difference > color_difference_threshold:
-            x0 = start_point[0] + grid_size // 2
-            y0 = start_point[1] + grid_size // 2
+            max_index = np.argmax(
+            valid_mask[
+                start_point[0] : start_point[0] + grid_size,
+                start_point[1] : start_point[1] + grid_size,
+                ]
+            )
+            pos_x, pos_y = np.unravel_index(max_index, (grid_size, grid_size))
+            x0 = start_point[0] + pos_x
+            y0 = start_point[1] + pos_y
+
+            # x0 = np.clip(start_point[0] + np.random.randint(-grid_size // 2, grid_size // 2), 0, image.shape[0] - grid_size)
+            # y0 = np.clip(start_point[1] + np.random.randint(-grid_size // 2, grid_size // 2), 0, image.shape[1] - grid_size)
+
+            # x0 = start_point[0] + grid_size // 2
+            # y0 = start_point[1] + grid_size // 2
             tract = compute_tract(
                 ode_system, (x0, y0), length_lines, min_length, tolerance=width
             )
@@ -145,11 +221,13 @@ def main():
     context.set_source_rgba(1, 1, 1, 1)  # Set background to white
     context.paint()
 
-    for setting in settings:
-
+    for i, setting in enumerate(settings):
+        print(f"Rendering layer {i+1}/{len(settings)}")
         # Compute the structural tensor
         J11, J22, J12 = compute_structural_tensor(
-            gaussian(image_gray, sigma=setting["sigma"])
+            gaussian(image_gray, sigma=setting["sigma"]),
+            rho=args.rho,
+            sigma=args.sigma,
         )
         print("Structural tensor computed.")
 
@@ -187,10 +265,11 @@ def main():
             coh,
             mask_threshold=0.5,
             color_difference_threshold=setting.get("color_threshold", 50),
-            grid_size=int(setting["width"]),
+            grid_size=int(setting["width"] / 2),
             length_lines=setting["length_lines"],
             min_length=setting["min_length"],
             width=setting["width"],
+            brush=get_brush(args.brush, setting["width"], args.brush_img),
         )
         # render_grid(context, surface, image, gradient_orientation, gradient_magnitude, mask_threshold=5, color_difference_threshold=100, grid_size=int(setting["width"]), length_lines=setting["length_lines"], min_length=setting["min_length"], width=setting["width"])
 

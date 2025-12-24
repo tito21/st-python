@@ -53,7 +53,7 @@ def angle_brush(
         context.stroke()
 
 
-def img_brush(context, curve, color, width=1.0, image=None):
+def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1):
     if image is None:
         raise ValueError("image must be provided for img_brush")
 
@@ -82,7 +82,7 @@ def img_brush(context, curve, color, width=1.0, image=None):
         image, (width / image.shape[0], width / image.shape[1], 1), order=0
     )
     for i in range(len(t)):
-        pi = p[i]
+        pi = p[i] + width * np.random.uniform(-jitter, jitter, size=2)
         # d_pi = d_p[i]
         # angle = np.arctan2(d_pi[0], d_pi[1])
         # image = ndi.rotate(image, np.degrees(angle), reshape=True)

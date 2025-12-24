@@ -53,6 +53,9 @@ def parse_args():
         default=None,
         help="Path to the brush image (only for img brush)",
     )
+    parser.add_argument(
+        "--debug", action="store_true", help="Save intermediate debug images"
+    )
     return parser.parse_args()
 
 
@@ -93,33 +96,6 @@ def get_brush(brush_type, width, brush_img_path):
         case "line":
             brush = partial(line_brush, width=width, num_segments=15)
     return brush
-
-
-def render(
-    context,
-    image,
-    orientation,
-    valid_mask,
-    mask_threshold=0.5,
-    num_lines=10000,
-    length_lines=100000.0,
-    width=2.0,
-):
-    # Compute the tractography
-    tracts = []
-
-    for _ in tqdm.trange(num_lines):
-        ode_system = ODESystem(orientation, valid_mask, mask_threshold)
-
-        start_point = (
-            np.random.randint(0, image.shape[0]),
-            np.random.randint(0, image.shape[1]),
-        )
-        tracts.append(compute_tract(ode_system, start_point, length_lines))
-
-    print("Tractography computed.")
-
-    draw_tracts(tracts, image, context, width)
 
 
 def render_grid(
@@ -182,9 +158,9 @@ def render_grid(
         )
         if color_difference > color_difference_threshold:
             max_index = np.argmax(
-            valid_mask[
-                start_point[0] : start_point[0] + grid_size,
-                start_point[1] : start_point[1] + grid_size,
+                valid_mask[
+                    start_point[0] : start_point[0] + grid_size,
+                    start_point[1] : start_point[1] + grid_size,
                 ]
             )
             pos_x, pos_y = np.unravel_index(max_index, (grid_size, grid_size))
@@ -201,6 +177,66 @@ def render_grid(
             )
 
             draw_tracts([tract], image, context, brush)
+
+
+def render_continuous(
+    context,
+    surface,
+    image,
+    orientation,
+    valid_mask,
+    num_lines=10000,
+    mask_threshold=0.5,
+    color_difference_threshold=100,
+    length_lines=1000.0,
+    min_length=1.0,
+    width=2.0,
+    brush=None,
+):
+
+    lines_drawn = 0
+    target = np.ndarray(
+        buffer=surface.get_data(),
+        shape=(image.shape[0], image.shape[1]),
+        dtype=np.uint32,
+    )
+    target = np.stack([((target >> 16) & 0xFF), ((target >> 8) & 0xFF), (target & 0xFF)], axis=-1).astype(np.uint8)
+
+    color_difference = np.linalg.norm(image - target, axis=-1)
+    error = np.mean(color_difference)
+
+    bar = tqdm.tqdm(total=num_lines)
+    while lines_drawn < num_lines and error > color_difference_threshold:
+
+        index = np.random.choice(color_difference.size, p=color_difference.flatten() / np.sum(color_difference))
+        x0, y0 = np.unravel_index(index, color_difference.shape)
+
+        # max_index = np.unravel_index(np.argmax(color_difference), color_difference.shape)
+        # x0, y0 = max_index
+
+        # x0 = np.random.randint(0, image.shape[0])
+        # y0 = np.random.randint(0, image.shape[1])
+
+        ode_system = ODESystem(orientation, valid_mask, mask_threshold)
+
+        target = np.ndarray(
+            buffer=surface.get_data(),
+            shape=(image.shape[0], image.shape[1]),
+            dtype=np.uint32,
+        )
+        target = np.stack([((target >> 16) & 0xFF), ((target >> 8) & 0xFF), (target & 0xFF)], axis=-1).astype(np.uint8)
+
+        color_difference = np.linalg.norm(image - target, axis=-1)
+        error = np.mean(color_difference)
+        tract = compute_tract(
+            ode_system, (x0, y0), length_lines, min_length, tolerance=width
+        )
+        draw_tracts([tract], image, context, brush)
+
+        lines_drawn += 1
+        bar.update(1)
+        bar.set_description(f"Lines drawn: {lines_drawn}, Color diff: {error:.2f}")
+    bar.close()
 
 
 def main():
@@ -257,25 +293,40 @@ def main():
             orientation = gradient_orientation
             print("Using gradient orientation vector.")
 
-        render_grid(
+        # render_grid(
+        #     context,
+        #     surface,
+        #     image,
+        #     orientation,
+        #     coh,
+        #     mask_threshold=0.5,
+        #     color_difference_threshold=setting.get("color_threshold", 50),
+        #     grid_size=int(setting["width"] / 2),
+        #     length_lines=setting["length_lines"],
+        #     min_length=setting["min_length"],
+        #     width=setting["width"],
+        #     brush=get_brush(args.brush, setting["width"], args.brush_img),
+        # )
+        render_continuous(
             context,
             surface,
             image,
             orientation,
             coh,
+            num_lines=setting["num_lines"],
             mask_threshold=0.5,
             color_difference_threshold=setting.get("color_threshold", 50),
-            grid_size=int(setting["width"] / 2),
             length_lines=setting["length_lines"],
             min_length=setting["min_length"],
             width=setting["width"],
             brush=get_brush(args.brush, setting["width"], args.brush_img),
         )
-        # render_grid(context, surface, image, gradient_orientation, gradient_magnitude, mask_threshold=5, color_difference_threshold=100, grid_size=int(setting["width"]), length_lines=setting["length_lines"], min_length=setting["min_length"], width=setting["width"])
 
-        # render(context, image, eigvecs[..., 0], coh, mask_threshold=0.5, num_lines=setting["num_lines"], length_lines=setting["length_lines"], width=setting["width"])
-        # render(context, image, gradient_orientation, gradient_magnitude, mask_threshold=20.0, num_lines=setting["num_lines"], length_lines=setting["length_lines"], width=setting["width"])
         print("Rendering completed.")
+        if args.debug:
+            debug_path = args.output.parent / f"debug_layer_{i+1}.png"
+            surface.write_to_png(debug_path)
+            print(f"Debug image saved to {debug_path}")
 
     surface.write_to_png(args.output)
 

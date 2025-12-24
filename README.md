@@ -19,6 +19,7 @@ Install [uv](https://docs.astral.sh/uv/) and run:
 uv run main.py INPUT_IMAGE OUTPUT_IMAGE [--params PARAMS_JSON] \
                                         [--orientation-vector {structural,gradient}] \
                                         [--rho RHO] [--sigma SIGMA] \
+                                        [--method {grid,continuous}] \
                                         [--brush {simple,angle,img,line}] \
                                         [--brush-img BRUSH_IMG]
 ```
@@ -30,10 +31,12 @@ algorithm. It should be a JSON file with the following structure:
 [
     { // First layer
          "sigma": 1.0,               // Standard deviation for Gaussian smoothing
+         "num_lines": 10000,         // Maximum number of lines to draw in this layer
          "length_lines": 10000.0,    // Maximum length of lines in this layer
          "width": 2.0,               // Width of lines in this layer
          "min_length": 10.0,         // Minimum length of lines to draw
-         "color_threshold": 50.0     // Minimum color difference to draw a line
+         "color_threshold": 50.0     // Minimum color difference to draw a line in grid mode or the minimum color
+                                     // difference to continue drawing lines in continuous mode
     },
     { // Second layer
         ...
@@ -52,6 +55,10 @@ the tensor computation.
 Since the preprint support for different brush types has been added. You can choose between `simple` (default), `angle`,
 `img`, and `line`. The `brush-img` argument can be used to provide a custom brush image when using the `img` brush type.
 
+The `method` argument specifies the rendering method to use. You can choose between `grid` (as described in the
+preprint) and `continuous` (default). The continuous method draws lines continuously until the color difference of the
+whole image is below the `color_threshold` parameter or a maximum number of lines specified by the `num_lines` parameter
+is reached.
 
 ## Reproducibility
 
@@ -78,6 +85,6 @@ bash make_montage.sh # MacOS/Linux (requires ImageMagick)
 
 # TODO
 
-- [ ] Use np.random.Generator for random numbers
+- [ ] Use np.random.Generator for random numbers (and set seed for reproducibility)
 - [ ] Parallelize line drawing
 - [ ] Normalize parametrs to be independent of image size

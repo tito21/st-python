@@ -42,6 +42,12 @@ def parse_args():
         help="Standard deviation of the derivative of gaussian filter for the structural tensor",
     )
     parser.add_argument(
+        "--method",
+        default="continuous",
+        choices=["grid", "continuous"],
+        help="Rendering method to use",
+    )
+    parser.add_argument(
         "--brush",
         default="simple",
         choices=["simple", "angle", "img", "line"],
@@ -293,34 +299,37 @@ def main():
             orientation = gradient_orientation
             print("Using gradient orientation vector.")
 
-        # render_grid(
-        #     context,
-        #     surface,
-        #     image,
-        #     orientation,
-        #     coh,
-        #     mask_threshold=0.5,
-        #     color_difference_threshold=setting.get("color_threshold", 50),
-        #     grid_size=int(setting["width"] / 2),
-        #     length_lines=setting["length_lines"],
-        #     min_length=setting["min_length"],
-        #     width=setting["width"],
-        #     brush=get_brush(args.brush, setting["width"], args.brush_img),
-        # )
-        render_continuous(
-            context,
-            surface,
-            image,
-            orientation,
-            coh,
-            num_lines=setting["num_lines"],
-            mask_threshold=0.5,
-            color_difference_threshold=setting.get("color_threshold", 50),
-            length_lines=setting["length_lines"],
-            min_length=setting["min_length"],
-            width=setting["width"],
-            brush=get_brush(args.brush, setting["width"], args.brush_img),
-        )
+        match args.method:
+            case "grid":
+                render_grid(
+                    context,
+                    surface,
+                    image,
+                    orientation,
+                    coh,
+                    mask_threshold=0.5,
+                    color_difference_threshold=setting.get("color_threshold", 50),
+                    grid_size=int(setting["width"] / 2),
+                    length_lines=setting["length_lines"],
+                    min_length=setting["min_length"],
+                    width=setting["width"],
+                    brush=get_brush(args.brush, setting["width"], args.brush_img),
+                )
+            case "continuous":
+                render_continuous(
+                    context,
+                    surface,
+                    image,
+                    orientation,
+                    coh,
+                    num_lines=setting["num_lines"],
+                    mask_threshold=0.5,
+                    color_difference_threshold=setting.get("color_threshold", 50),
+                    length_lines=setting["length_lines"],
+                    min_length=setting["min_length"],
+                    width=setting["width"],
+                    brush=get_brush(args.brush, setting["width"], args.brush_img),
+                )
 
         print("Rendering completed.")
         if args.debug:

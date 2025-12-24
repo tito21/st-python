@@ -75,3 +75,9 @@ bash run_all.sh # MacOS/Linux
 bash make_montage.sh # MacOS/Linux (requires ImageMagick)
 
 ```
+
+# TODO
+
+- [ ] Use np.random.Generator for random numbers
+- [ ] Parallelize line drawing
+- [ ] Normalize parametrs to be independent of image size

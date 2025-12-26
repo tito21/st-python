@@ -297,14 +297,14 @@ def main():
         )
 
         # Compute the coherence
-        coh = coherence(eigvals)
+        coh = coherence(eigvals).astype(np.float32)
         print("Coherence computed.")
 
         if args.orientation_vector == "structural":
-            orientation = eigvecs[..., 0]
+            orientation = eigvecs[..., 0].astype(np.float32)
             print("Using structural orientation vector.")
         else:
-            orientation = gradient_orientation
+            orientation = gradient_orientation.astype(np.float32)
             print("Using gradient orientation vector.")
 
         match args.method:

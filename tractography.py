@@ -1,4 +1,5 @@
 from collections import namedtuple
+import math
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -91,18 +92,18 @@ def clip(value, min_value, max_value):
 
 def bilinear_interpolate(image, point):
     x, y = point
-    x0 = clip(int(np.floor(x)), 0, image.shape[0] - 1)
+    x0 = clip(math.floor(x), 0, image.shape[0] - 1)
     x1 = min(x0 + 1, image.shape[0] - 1)
-    y0 = clip(int(np.floor(y)), 0, image.shape[1] - 1)
+    y0 = clip(math.floor(y), 0, image.shape[1] - 1)
     y1 = min(y0 + 1, image.shape[1] - 1)
 
     dx = x - x0
     dy = y - y0
 
-    top = (1 - dx) * image[x0, y0] + dx * image[x1, y0]
-    bottom = (1 - dx) * image[x0, y1] + dx * image[x1, y1]
-
-    return (1 - dy) * top + dy * bottom
+    return ((1 - dx) * (1 - dy) * image[x0, y0] +
+            dx * (1 - dy) * image[x1, y0] +
+            (1 - dx) * dy * image[x0, y1] +
+            dx * dy * image[x1, y1])
 
 
 class ODESystem:
@@ -135,7 +136,8 @@ class ODESystem:
         # Compute the derivative using the orientation
         # vector = self.orientation_interpolated(y)[0]
         vector = bilinear_interpolate(self.orientation, y)
-        if np.dot(vector, self.last_vector) < 0:
+        dir = vector[0] * self.last_vector[0] + vector[1] * self.last_vector[1]
+        if dir < 0:
             vector = -vector
         self.last_vector = vector
         return vector
@@ -209,7 +211,9 @@ def simplify_tract(tract, tolerance=1.0):
         return [start]
 
     line_unit = line_vec / line_len
-    distances = np.abs(np.cross(tract - start, line_unit))  # Perpendicular distance
+    diff = tract - start
+    cross = diff[:, 0] * line_unit[1] - diff[:, 1] * line_unit[0]
+    distances = np.abs(cross)  # Perpendicular distance
     max_dist = np.max(distances)
 
     if max_dist < tolerance:

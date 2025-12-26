@@ -10,3 +10,8 @@ dependencies = [
     "scikit-image>=0.25.2",
     "tqdm>=4.67.1",
 ]
+
+[dependency-groups]
+dev = [
+    "snakeviz>=2.2.2",
+]

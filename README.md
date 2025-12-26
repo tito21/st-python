@@ -88,3 +88,4 @@ bash make_montage.sh # MacOS/Linux (requires ImageMagick)
 - [ ] Use np.random.Generator for random numbers (and set seed for reproducibility)
 - [ ] Parallelize line drawing
 - [ ] Normalize parametrs to be independent of image size
+- [ ] Add tests

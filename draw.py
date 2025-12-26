@@ -53,7 +53,7 @@ def angle_brush(
         context.stroke()
 
 
-def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1):
+def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1, rng=None):
     if image is None:
         raise ValueError("image must be provided for img_brush")
 
@@ -82,7 +82,7 @@ def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1):
         image, (width / image.shape[0], width / image.shape[1], 1), order=0
     )
     for i in range(len(t)):
-        pi = p[i] + width * np.random.uniform(-jitter, jitter, size=2)
+        pi = p[i] + width * rng.uniform(-jitter, jitter, size=2)
         # d_pi = d_p[i]
         # angle = np.arctan2(d_pi[0], d_pi[1])
         # image = ndi.rotate(image, np.degrees(angle), reshape=True)
@@ -123,15 +123,15 @@ def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1):
 
 def line_brush(context, curve, color, width=1.0, num_segments=10):
     context.set_line_join(cairo.LineJoin.ROUND)
-    context.set_line_width(0.5 * (width / num_segments))
+    context.set_line_width(0.75 * (width / num_segments))
     context.set_source_rgba(color[0], color[1], color[2], 1)
     angle = np.arctan2(curve[3][0] - curve[0][0], curve[3][1] - curve[0][1])
     sin_a = np.sin(angle)
     cos_a = np.cos(angle)
     for r in range(-num_segments // 2, num_segments // 2):
         offset = (r / num_segments) * width
-        offest_x = offset * cos_a + np.random.uniform(-0.5 * (width / num_segments), 0.5 * (width / num_segments))
-        offest_y = offset * sin_a + np.random.uniform(-0.5 * (width / num_segments), 0.5 * (width / num_segments))
+        offest_x = offset * cos_a + rng.uniform(-0.5 * (width / num_segments), 0.5 * (width / num_segments))
+        offest_y = offset * sin_a + rng.uniform(-0.5 * (width / num_segments), 0.5 * (width / num_segments))
         context.move_to(curve[0][1] + offest_x, curve[0][0] + offest_y)
         context.curve_to(
             curve[1][1] + offest_x,

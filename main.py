@@ -1,6 +1,5 @@
 import pathlib
 import argparse
-import random
 import json
 from functools import partial
 
@@ -62,6 +61,9 @@ def parse_args():
     parser.add_argument(
         "--debug", action="store_true", help="Save intermediate debug images"
     )
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Random seed for reproducibility"
+    )
     return parser.parse_args()
 
 
@@ -83,7 +85,7 @@ def get_settings(params_path):
         return settings
 
 
-def get_brush(brush_type, width, brush_img_path):
+def get_brush(brush_type, width, brush_img_path, rng):
     match brush_type:
         case "simple":
             brush = partial(simple_brush, width=width)
@@ -98,7 +100,7 @@ def get_brush(brush_type, width, brush_img_path):
         case "img":
             brush_image = io.imread(brush_img_path)
             brush_image = brush_image.astype(np.float32) / 255.0
-            brush = partial(img_brush, width=width, image=brush_image)
+            brush = partial(img_brush, width=width, image=brush_image, jitter=0.1, rng=rng)
         case "line":
             brush = partial(line_brush, width=width, num_segments=15)
     return brush
@@ -117,22 +119,25 @@ def render_grid(
     min_length=1.0,
     width=2.0,
     brush=None,
+    rng=None,
 ):
     start_points = [
         (i, j)
         for i in range(0, image.shape[0], grid_size)
         for j in range(0, image.shape[1], grid_size)
     ]
-    random.shuffle(start_points)
+
+    rng.shuffle(start_points)
+
     for start_point in tqdm.tqdm(start_points):
         # start_point = (
         #     np.clip(
-        #         start_point[0] + np.random.randint(0, grid_size // 2),
+        #         start_point[0] + rng.integers(0, grid_size // 2),
         #         grid_size // 2,
         #         image.shape[0] - grid_size // 2,
         #     ),
         #     np.clip(
-        #         start_point[1] + np.random.randint(0, grid_size // 2),
+        #         start_point[1] + rng.integers(0, grid_size // 2),
         #         grid_size // 2,
         #         image.shape[1] - grid_size // 2,
         #     ),
@@ -173,8 +178,8 @@ def render_grid(
             x0 = start_point[0] + pos_x
             y0 = start_point[1] + pos_y
 
-            # x0 = np.clip(start_point[0] + np.random.randint(-grid_size // 2, grid_size // 2), 0, image.shape[0] - grid_size)
-            # y0 = np.clip(start_point[1] + np.random.randint(-grid_size // 2, grid_size // 2), 0, image.shape[1] - grid_size)
+            # x0 = np.clip(start_point[0] + rng.integers(-grid_size // 2, grid_size // 2), 0, image.shape[0] - grid_size)
+            # y0 = np.clip(start_point[1] + rng.integers(-grid_size // 2, grid_size // 2), 0, image.shape[1] - grid_size)
 
             # x0 = start_point[0] + grid_size // 2
             # y0 = start_point[1] + grid_size // 2
@@ -198,6 +203,7 @@ def render_continuous(
     min_length=1.0,
     width=2.0,
     brush=None,
+    rng=None,
 ):
 
     lines_drawn = 0
@@ -214,14 +220,14 @@ def render_continuous(
     bar = tqdm.tqdm(total=num_lines)
     while lines_drawn < num_lines and error > color_difference_threshold:
 
-        index = np.random.choice(color_difference.size, p=color_difference.flatten() / np.sum(color_difference))
+        index = rng.choice(color_difference.size, p=color_difference.flatten() / np.sum(color_difference))
         x0, y0 = np.unravel_index(index, color_difference.shape)
 
         # max_index = np.unravel_index(np.argmax(color_difference), color_difference.shape)
         # x0, y0 = max_index
 
-        # x0 = np.random.randint(0, image.shape[0])
-        # y0 = np.random.randint(0, image.shape[1])
+        # x0 = rng.integers(0, image.shape[0])
+        # y0 = rng.integers(0, image.shape[1])
 
         ode_system = ODESystem(orientation, valid_mask, mask_threshold)
 
@@ -249,6 +255,8 @@ def main():
     args = parse_args()
     print(f"Input image path: {args.path}")
     print(f"Output image path: {args.output}")
+
+    rng = np.random.default_rng(args.seed)
 
     settings = get_settings(args.params)
 
@@ -313,7 +321,8 @@ def main():
                     length_lines=setting["length_lines"],
                     min_length=setting["min_length"],
                     width=setting["width"],
-                    brush=get_brush(args.brush, setting["width"], args.brush_img),
+                    brush=get_brush(args.brush, setting["width"], args.brush_img, rng),
+                    rng=rng,
                 )
             case "continuous":
                 render_continuous(
@@ -328,7 +337,8 @@ def main():
                     length_lines=setting["length_lines"],
                     min_length=setting["min_length"],
                     width=setting["width"],
-                    brush=get_brush(args.brush, setting["width"], args.brush_img),
+                    brush=get_brush(args.brush, setting["width"], args.brush_img, rng),
+                    rng=rng,
                 )
 
         print("Rendering completed.")

@@ -1,5 +1,5 @@
 [project]
-name = "st-python"
+name = "st"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -9,22 +9,27 @@ dependencies = [
     "pycairo>=1.28.0",
     "scikit-image>=0.25.2",
     "tqdm>=4.67.1",
+    "numpy>=2.0.0",
 ]
+
+[project.scripts]
+main = "st.scripts.main:main"
 
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["cython", "scikit-build-core>=0.11", "numpy>=2.0.0"]
+build-backend = "scikit_build_core.build"
 
-[tool.setuptools]
-package-dir = {"" = "."}
-ext-modules = [
-    {name = "utils", sources = ["utils.c"]},
-    {name = "cbezier", sources = ["cbezier.c"], include-dirs = ["numpy"]},
-]
+[tool.scikit-build]
+wheel.packages = ["src/st"]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+
+
+[tool.uv]
+package = true
 
 
 [dependency-groups]
 dev = [
-    "cython>=3.2.3",
     "snakeviz>=2.2.2",
 ]

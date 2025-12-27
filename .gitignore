@@ -16,3 +16,5 @@ test-data/*
 test_*.py
 out*.png
 *.c
+
+*.prof

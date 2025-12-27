@@ -1,6 +1,6 @@
 import numpy as np
 
-from cbezier import fit_cubic
+from .cbezier import fit_cubic
 
 def fit_curve(points, error):
     # points must have shape (2, n)

@@ -2,8 +2,8 @@ import numpy as np
 import cairo
 import scipy.ndimage as ndi
 
-from utils import bilinear_interpolate
-from bezier import bezier_point
+from .utils import bilinear_interpolate
+from .bezier import bezier_point
 
 
 def simple_brush(context, curve, color, width=1.0):

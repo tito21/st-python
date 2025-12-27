@@ -9,8 +9,8 @@ from skimage.filters import gaussian
 import cairo
 import tqdm.auto as tqdm
 
-from draw import draw_tracts, simple_brush, angle_brush, img_brush, line_brush
-from tractography import *
+from st.draw import draw_tracts, simple_brush, angle_brush, img_brush, line_brush
+from st.tractography import *
 
 
 def parse_args():

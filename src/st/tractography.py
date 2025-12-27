@@ -6,8 +6,8 @@ from scipy.ndimage import gaussian_filter
 from scipy.integrate import solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 
-from bezier import fit_curve
-from utils import bilinear_interpolate
+from .bezier import fit_curve
+from .utils import bilinear_interpolate
 
 
 def compute_structural_tensor(image, rho=1.0, sigma=1.0):

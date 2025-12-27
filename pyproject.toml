@@ -11,7 +11,20 @@ dependencies = [
     "tqdm>=4.67.1",
 ]
 
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+ext-modules = [
+    {name = "utils", sources = ["utils.c"]},
+    {name = "cbezier", sources = ["cbezier.c"], include-dirs = ["numpy"]},
+]
+
+
 [dependency-groups]
 dev = [
+    "cython>=3.2.3",
     "snakeviz>=2.2.2",
 ]

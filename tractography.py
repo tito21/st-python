@@ -7,6 +7,7 @@ from scipy.integrate import solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 
 from bezier import fit_curve
+from utils import bilinear_interpolate
 
 
 def compute_structural_tensor(image, rho=1.0, sigma=1.0):
@@ -84,26 +85,6 @@ def coherence(eigenvalues):
     coherence[lambda_sum == 0] = 0
 
     return coherence
-
-
-def clip(value, min_value, max_value):
-    return max(min(value, max_value), min_value)
-
-
-def bilinear_interpolate(image, point):
-    x, y = point
-    x0 = clip(math.floor(x), 0, image.shape[0] - 1)
-    x1 = min(x0 + 1, image.shape[0] - 1)
-    y0 = clip(math.floor(y), 0, image.shape[1] - 1)
-    y1 = min(y0 + 1, image.shape[1] - 1)
-
-    dx = x - x0
-    dy = y - y0
-
-    return ((1 - dx) * (1 - dy) * image[x0, y0] +
-            dx * (1 - dy) * image[x1, y0] +
-            (1 - dx) * dy * image[x0, y1] +
-            dx * dy * image[x1, y1])
 
 
 class ODESystem:

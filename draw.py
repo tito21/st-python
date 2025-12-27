@@ -2,7 +2,7 @@ import numpy as np
 import cairo
 import scipy.ndimage as ndi
 
-from tractography import bilinear_interpolate
+from utils import bilinear_interpolate
 from bezier import bezier_point
 
 
@@ -144,9 +144,14 @@ def line_brush(context, curve, color, width=1.0, num_segments=10):
         context.stroke()
 
 
+def get_midpoint_color(image, curve):
+    x = curve[:, 0].mean()
+    y = curve[:, 1].mean()
+    return bilinear_interpolate(image, (x, y))
+
+
 def draw_tracts(tracts, image, context, brush):
     for tract in tracts:
         for curve in tract:
-            mid_point = curve.shape[0] // 2
-            color = bilinear_interpolate(image, curve[mid_point])
+            color = get_midpoint_color(image, curve)
             brush(context, curve, color)

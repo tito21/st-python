@@ -99,7 +99,7 @@ def get_brush(brush_type, width, brush_img_path, rng):
             )
         case "img":
             brush_image = io.imread(brush_img_path)
-            brush_image = brush_image.astype(np.float32) / 255.0
+            brush_image = brush_image / 255.0
             brush = partial(img_brush, width=width, image=brush_image, jitter=0.1, rng=rng)
         case "line":
             brush = partial(line_brush, width=width, num_segments=15)
@@ -261,7 +261,7 @@ def main():
     settings = get_settings(args.params)
 
     image = io.imread(args.path)
-    image = image.astype(np.float32) / 255.0
+    image = image / 255.0
     image_gray = np.mean(image, axis=2) if image.ndim == 3 else image
     if image.ndim == 2:
         image = np.stack([image, image, image], axis=-1)
@@ -297,14 +297,14 @@ def main():
         )
 
         # Compute the coherence
-        coh = coherence(eigvals).astype(np.float32)
+        coh = coherence(eigvals)
         print("Coherence computed.")
 
         if args.orientation_vector == "structural":
-            orientation = eigvecs[..., 0].astype(np.float32)
+            orientation = eigvecs[..., 0]
             print("Using structural orientation vector.")
         else:
-            orientation = gradient_orientation.astype(np.float32)
+            orientation = gradient_orientation
             print("Using gradient orientation vector.")
 
         match args.method:

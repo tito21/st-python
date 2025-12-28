@@ -6,8 +6,9 @@ from scipy.ndimage import gaussian_filter
 from scipy.integrate import solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 
-from .bezier import fit_curve
+from .bezier import fit_curve, fit_curve_lsqr
 from .utils import bilinear_interpolate
+from .simplify_tract import simplify_tract
 
 
 def compute_structural_tensor(image, rho=1.0, sigma=1.0):
@@ -170,38 +171,10 @@ def compute_tract(ode_system, starting_point, max_length, min_length=1.0, tolera
         ode_system.f, [0, max_length], starting_point, events=events, method="RK23"
     )
     # sol = RK4(ode_system.f, [0, max_length], starting_point, events=events, dt = 1.0)
-    tract = simplify_tract([v for v in sol.y.T], tolerance=1.0)
+    tract = simplify_tract(sol.y.T, tolerance=1.0)
     if len(tract) < 4 or np.linalg.norm(sol.t[-1]) < min_length:
         return []
-    bezier = fit_curve(tract, error=tolerance * 0.5)
+    bezier = fit_curve(tract, error=tolerance * 0.05)
     if np.any(np.isnan(bezier)):
         return []
     return bezier
-
-
-def simplify_tract(tract, tolerance=1.0):
-    # Simplify the tract using the Ramer-Douglas-Peucker algorithm
-    if len(tract) < 3:
-        return tract
-
-    # Find the point with the maximum distance from the line
-    start, end = tract[0], tract[-1]
-    line_vec = end - start
-    line_len = np.linalg.norm(line_vec)
-    if line_len < 1e-6:
-        return [start]
-
-    line_unit = line_vec / line_len
-    diff = tract - start
-    cross = diff[:, 0] * line_unit[1] - diff[:, 1] * line_unit[0]
-    distances = np.abs(cross)  # Perpendicular distance
-    max_dist = np.max(distances)
-
-    if max_dist < tolerance:
-        return [start, end]
-
-    # Recursively simplify the segments
-    split_idx = np.argmax(distances)
-    left = simplify_tract(tract[: split_idx + 1], tolerance)
-    right = simplify_tract(tract[split_idx:], tolerance)
-    return left[:-1] + right

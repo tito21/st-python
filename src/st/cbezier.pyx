@@ -17,7 +17,6 @@ def fit_cubic(
     cdef cnp.ndarray[cnp.float64_t, ndim=2] bezier
     # Use heuristic if region has only two points
     if num_points == 2:
-
         distance = np.linalg.norm(points[1] - points[0]) / 3.0
         bezier = np.array([points[0], points[0] + t_hat1 * distance, points[1] + t_hat2 * distance, points[1]])
         return [bezier]
@@ -28,12 +27,6 @@ def fit_cubic(
 
     max_error, split_point = compute_max_error(bezier, points, u)
 
-    if max_error < error:
-
-        bezier, finished = iterations(bezier, points, u, max_iter, t_hat1, t_hat2, error)
-        if finished:
-            return [bezier]
-
     # If error not too large, try reparameterization and iteration
     if max_error < iteration_error:
         bezier, finished = iterations(bezier, points, u, max_iter, t_hat1, t_hat2, error)
@@ -41,9 +34,9 @@ def fit_cubic(
             return [bezier]
 
     # fitting failed split and retry
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] left = points[:split_point + 1]
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] right = points[split_point:]
-    cdef cnp.ndarray[cnp.float64_t, ndim=1] t_hat_center = points[split_point - 1] - points[split_point + 1]
+    left = points[:split_point + 1]
+    right = points[split_point:]
+    t_hat_center = points[split_point - 1] - points[split_point + 1]
     t_hat_center /= np.linalg.norm(t_hat_center) + 1e-6
     return fit_cubic(left, t_hat1, t_hat_center, error) + fit_cubic(right, -t_hat_center, t_hat2, error)
 
@@ -52,11 +45,11 @@ cdef tuple[cnp.ndarray, bint] iterations(
     cnp.ndarray[cnp.float64_t, ndim=2] bezier,
     cnp.ndarray[cnp.float64_t, ndim=2] points,
     cnp.ndarray[cnp.float64_t, ndim=1] u,
-    int max_iter, cnp.ndarray[cnp.float64_t, ndim=1]
-    t_hat1, cnp.ndarray[cnp.float64_t, ndim=1]
-    t_hat2,
+    int max_iter,
+    cnp.ndarray[cnp.float64_t, ndim=1] t_hat1,
+    cnp.ndarray[cnp.float64_t, ndim=1] t_hat2,
     double error
-):
+) noexcept:
     cdef int _
     cdef cnp.ndarray[cnp.float64_t, ndim=1] u_prime
     cdef int split_point
@@ -78,7 +71,7 @@ cdef cnp.ndarray[cnp.float64_t, ndim=1] newton_raphson_root_find(
     cnp.ndarray[cnp.float64_t, ndim=2] bezier,
     cnp.ndarray[cnp.float64_t, ndim=2] point,
     cnp.ndarray[cnp.float64_t, ndim=1] u
-):
+) noexcept:
 
     cdef cnp.ndarray[cnp.float64_t, ndim=2] Q_u = bezier_point_c(3, bezier, u)
 
@@ -99,7 +92,7 @@ cdef tuple[double, int] compute_max_error(
     cnp.ndarray[cnp.float64_t, ndim=2] bezier,
     cnp.ndarray[cnp.float64_t, ndim=2] points,
     cnp.ndarray[cnp.float64_t, ndim=1] u
-):
+) noexcept:
 
     cdef cnp.ndarray[cnp.float64_t, ndim=2] p = bezier_point_c(3, bezier, u)
 
@@ -126,38 +119,37 @@ cdef cnp.ndarray[cnp.float64_t, ndim=2] generate_bezier(
     cnp.ndarray[cnp.float64_t, ndim=1] u,
     cnp.ndarray[cnp.float64_t, ndim=1] t_hat1,
     cnp.ndarray[cnp.float64_t, ndim=1] t_hat2
-):
+) noexcept:
 
-    A = np.zeros((len(u), 2, 2))
+    # A = np.zeros((len(u), 2, 2))
 
-    A[:, 0, 0] = t_hat1[0] * (3 * u * (1.0 - u )**2)
-    A[:, 0, 1] = t_hat1[1] * (3 * u**2 * (1.0 - u))
-    A[:, 1, 0] = t_hat2[0] * (3 * u * (1.0 - u )**2)
-    A[:, 1, 1] = t_hat2[1] * (3 * u**2 * (1.0 - u))
-
-
-    C = np.zeros((2, 2))
-    X = np.zeros((2,))
-
-    C[0, 0] = np.sum(np.vecdot(A[:, 0], A[:, 0]))
-    C[0, 1] = np.sum(np.vecdot(A[:, 0], A[:, 1]))
-    C[1, 0] = C[0, 1]
-    C[1, 1] = np.sum(np.vecdot(A[:, 1], A[:, 1]))
-
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] u_expanded = u[:, np.newaxis]
-    tmp = points - (points[0] * (1.0 - u_expanded)**3 + points[0] * 3 * u_expanded * (1.0 - u_expanded)**2 + points[-1] * 3 * u_expanded**2 * (1.0 - u_expanded) + points[-1] * u_expanded**3)
-
-    X[0] = np.sum(np.vecdot(A[:, 0], tmp))
-    X[1] = np.sum(np.vecdot(A[:, 1], tmp))
+    # A[:, 0, 0] = t_hat1[0] * (3 * u * (1.0 - u )**2)
+    # A[:, 0, 1] = t_hat1[1] * (3 * u**2 * (1.0 - u))
+    # A[:, 1, 0] = t_hat2[0] * (3 * u * (1.0 - u )**2)
+    # A[:, 1, 1] = t_hat2[1] * (3 * u**2 * (1.0 - u))
 
 
-    det_C0_C1 = C[0, 0] * C[1, 1] - C[1, 0] * C[0, 1]
-    det_C0_X  = C[0, 0] * X[1] - C[1, 0] * X[0]
-    det_X_C1  = X[0] * C[1, 1] - X[1] * C[0, 1]
+    # C = np.zeros((2, 2))
+    # X = np.zeros((2,))
 
-    alpha_l = 0.0 if det_C0_C1 == 0 else det_X_C1 / det_C0_C1
-    alpha_r = 0.0 if det_C0_C1 == 0 else det_C0_X / det_C0_C1
-    # alpha = np.array([alpha_l, alpha_r])
+    # C[0, 0] = np.sum(np.vecdot(A[:, 0], A[:, 0]))
+    # C[0, 1] = np.sum(np.vecdot(A[:, 0], A[:, 1]))
+    # C[1, 0] = C[0, 1]
+    # C[1, 1] = np.sum(np.vecdot(A[:, 1], A[:, 1]))
+
+    # cdef cnp.ndarray[cnp.float64_t, ndim=2] u_expanded = u[:, np.newaxis]
+    # tmp = points - (points[0] * (1.0 - u_expanded)**3 + points[0] * 3 * u_expanded * (1.0 - u_expanded)**2 + points[-1] * 3 * u_expanded**2 * (1.0 - u_expanded) + points[-1] * u_expanded**3)
+
+    # X[0] = np.sum(np.vecdot(A[:, 0], tmp))
+    # X[1] = np.sum(np.vecdot(A[:, 1], tmp))
+
+
+    # det_C0_C1 = C[0, 0] * C[1, 1] - C[1, 0] * C[0, 1]
+    # det_C0_X  = C[0, 0] * X[1] - C[1, 0] * X[0]
+    # det_X_C1  = X[0] * C[1, 1] - X[1] * C[0, 1]
+
+    # alpha_l = 0.0 if det_C0_C1 == 0 else det_X_C1 / det_C0_C1
+    # alpha_r = 0.0 if det_C0_C1 == 0 else det_C0_X / det_C0_C1
 
     # try:
     #     alpha = np.linalg.solve(C, X)
@@ -165,6 +157,38 @@ cdef cnp.ndarray[cnp.float64_t, ndim=2] generate_bezier(
     # except np.linalg.LinAlgError:
     #     # If the system is singular, use heuristic
     #     alpha = np.array([1e-6, 1e-6])
+    # alpha_l = alpha[0]
+    # alpha_r = alpha[1]
+
+    # Bernstein basis
+    B0 = (1 - u)**3
+    B1 = 3 * (1 - u)**2 * u
+    B2 = 3 * (1 - u) * u**2
+    B3 = u**3
+
+    # We want:
+    #   P(t) = B0*P0 + B1*(P0 + α u0) + B2*(P3 + β u3) + B3*P3
+    #        = [B0*P0 + B1*P0 + B2*P3 + B3*P3] + α B1 u0 + β B2 u3
+    #        = base(t) + α B1 u0 + β B2 u3
+    base = (
+        (B0 + B1)[:, None] * points[0] +
+        (B2 + B3)[:, None] * points[-1]
+    )
+
+    A_blocks = []
+    rhs_blocks = []
+
+    for j in range(2):  # x, y
+        A_j = np.column_stack([B1 * t_hat1[j], B2 * t_hat2[j]])  # (N, 2)
+        rhs_j = points[:, j] - base[:, j]                   # (N,)
+        A_blocks.append(A_j)
+        rhs_blocks.append(rhs_j)
+
+    A = np.vstack(A_blocks)        # (2N, 2)
+    rhs = np.concatenate(rhs_blocks)  # (2N,)
+
+    alpha_r, alpha_l = np.linalg.lstsq(A, rhs, rcond=None)[0]
+
 
     # if alpha is negative, use heuristic
     seg_length = np.linalg.norm(points[0] - points[-1])
@@ -177,11 +201,12 @@ cdef cnp.ndarray[cnp.float64_t, ndim=2] generate_bezier(
     return bezier
 
 
-cdef cnp.ndarray[cnp.float64_t, ndim=1] chord_length_parametrization(cnp.ndarray[cnp.float64_t, ndim=2] points):
+cdef cnp.ndarray[cnp.float64_t, ndim=1] chord_length_parametrization(cnp.ndarray[cnp.float64_t, ndim=2] points) noexcept:
     # Compute the chord length for each segment
-    lengths = np.linalg.norm(points[1:] - points[:-1], axis=1)
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] lengths = np.linalg.norm(points[1:] - points[:-1], axis=1)
     # Compute the cumulative length
-    cumulative_lengths = np.insert(np.cumsum(lengths), 0, 0)
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] cumulative_lengths = np.zeros(len(points))
+    cumulative_lengths[1:] = np.cumsum(lengths)
     # Normalize to get parameters in [0, 1]
     return cumulative_lengths / cumulative_lengths[-1]
 
@@ -189,7 +214,7 @@ cdef cnp.ndarray[cnp.float64_t, ndim=1] chord_length_parametrization(cnp.ndarray
 cdef cnp.ndarray[cnp.float64_t, ndim=2] bezier_point_c(
     int degree, cnp.ndarray[cnp.float64_t, ndim=2] bezier,
     cnp.ndarray[cnp.float64_t, ndim=1] t
-):
+) noexcept:
     # Compute the point on the Bezier curve at parameter t
     cdef cnp.ndarray[cnp.float64_t, ndim=2] t_expanded = t[:, np.newaxis]
     if degree == 0:
@@ -201,4 +226,4 @@ cdef cnp.ndarray[cnp.float64_t, ndim=2] bezier_point_c(
     elif degree == 3:
         return (1.0 - t_expanded)**3 * bezier[0] + 3 * (1.0 - t_expanded)**2 * t_expanded * bezier[1] + 3 * (1.0 - t_expanded) * t_expanded**2 * bezier[2] + t_expanded**3 * bezier[3]
     else:
-        raise ValueError("Unsupported Bezier degree. Only degrees 0 to 3 are supported.")
+        return np.zeros((len(t), bezier.shape[1]))

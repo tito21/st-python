@@ -1,4 +1,7 @@
+from math import comb
+
 import numpy as np
+from scipy.linalg import lstsq
 
 from .cbezier import fit_cubic
 
@@ -17,160 +20,154 @@ def fit_curve(points, error):
 
     return fitted_curve
 
-# def fit_cubic(points, t_hat1, t_hat2, error):
-
-#     num_points = points.shape[0]
-#     iteration_error = error * 4
-#     max_iter = 4
-
-#     # Use heuristic if region has only two points
-#     if num_points == 2:
-
-#         distance = np.linalg.norm(points[1] - points[0]) / 3.0
-
-#         bezier = np.array([points[0], points[0] + t_hat1 * distance, points[1] + t_hat2 * distance, points[1]])
-#         return [bezier]
+def bernstein_poly(i, n, t):
+    return comb(n, i) * (t ** i) * ((1 - t) ** (n - i))
 
 
-#     u = chord_length_parametrization(points)
-#     bezier = generate_bezier(points, u, t_hat1, t_hat2)
+def fit_segment(points, t1_hat, t2_hat, u):
+    # points must have shape (2, n)
+    # Convert points to a NumPy array
+    points = np.array(points)
+    num_points = points.shape[0]
 
-#     max_error, split_point = compute_max_error(bezier, points, u)
+    # Construct the Bernstein basis matrix
+    # n = 3  # Cubic Bezier
+    # B = np.zeros((num_points, n + 1))
+    # for i in range(n + 1):
+    #     B[:, i] = bernstein_poly(i, n, u)
 
-#     if max_error < error:
-#         return [bezier]
+    # Solve for control points using least squares
+    # P = np.linalg.lstsq(B, points, rcond=None)[0]
+    # P = lstsq(B, points)[0]
+    # bezier_curve = P.reshape((4, 2))
 
-#     # If error not too large, try reparameterization and iteration
-#     if max_error < iteration_error:
-#         for _ in range(max_iter):
-#             u_prime = reparameterize(bezier, points, u)
+    # Bernstein basis
+    B0 = (1 - u)**3
+    B1 = 3 * (1 - u)**2 * u
+    B2 = 3 * (1 - u) * u**2
+    B3 = u**3
 
-#             bezier = generate_bezier(points, u_prime, t_hat1, t_hat2)
-#             max_error, split_point = compute_max_error(bezier, points, u_prime)
-#             if max_error < error:
-#                 return [bezier]
+    # We want:
+    #   P(t) = B0*P0 + B1*(P0 + α u0) + B2*(P3 + β u3) + B3*P3
+    #        = [B0*P0 + B1*P0 + B2*P3 + B3*P3] + α B1 u0 + β B2 u3
+    #        = base(t) + α B1 u0 + β B2 u3
+    base = (
+        (B0 + B1)[:, None] * points[0] +
+        (B2 + B3)[:, None] * points[-1]
+    )
 
-#             u = u_prime
+    A_blocks = []
+    rhs_blocks = []
 
-#     # fitting failed split and retry
-#     left = points[:split_point + 1]
-#     right = points[split_point:]
-#     t_hat_center = points[split_point - 1] - points[split_point + 1]
-#     t_hat_center /= np.linalg.norm(t_hat_center) + 1e-6
-#     return fit_cubic(left, t_hat1, t_hat_center, error) + fit_cubic(right, -t_hat_center, t_hat2, error)
+    for j in range(2):  # x, y
+        A_j = np.column_stack([B1 * t1_hat[j], B2 * t2_hat[j]])  # (N, 2)
+        rhs_j = points[:, j] - base[:, j]                   # (N,)
+        A_blocks.append(A_j)
+        rhs_blocks.append(rhs_j)
 
+    A = np.vstack(A_blocks)        # (2N, 2)
+    rhs = np.concatenate(rhs_blocks)  # (2N,)
 
-# def reparameterize(bezier, points, u):
+    alpha_r, alpha_l = lstsq(A, rhs)[0]
 
-#     # u_prime = np.zeros_like(u)
+    bezier_curve = np.array([
+        points[0],
+        points[0] + t1_hat * alpha_r,
+        points[-1] + t2_hat * alpha_l,
+        points[-1]
+    ])
+    return bezier_curve
 
-#     # for i in range(len(points)):
-#     #     u_prime[i] = newton_raphson_root_find(bezier, points[i], u[i])
+def current_error(points, bezier, u):
+    num_points = points.shape[0]
+    # u = chord_length_parametrization(points)
+    error = np.zeros(len(points))
+    for i in range(num_points):
+        t = u[i]
+        B = np.array([bernstein_poly(j, 3, t) for j in range(4)])
+        point_on_curve = B @ bezier
+        error[i] = np.linalg.norm(point_on_curve - points[i]) ** 2
+    error = np.sqrt(error)
+    return error
 
+def chord_length_parametrization(points):
+    # Compute the chord length for each segment
+    lengths = np.linalg.norm(points[1:] - points[:-1], axis=1)
+    # Compute the cumulative length
+    cumulative_length = np.zeros(len(points))
+    cumulative_length[1:] = np.cumsum(lengths)
+    # Normalize to get parameter values in [0, 1]
+    cumulative_length /= cumulative_length[-1] + 1e-6
+    return cumulative_length
 
-#     u_prime = newton_raphson_root_find(bezier, points, u)
+def nr_root_reparameterize(bezier, points, error):
+    num_points = points.shape[0]
+    u = chord_length_parametrization(points)
 
-#     return u_prime
+    # Vectorized Bernstein polynomial evaluation
+    t = u[:, np.newaxis]
+    B = np.array([[bernstein_poly(j, 3, u[i]) for j in range(4)] for i in range(num_points)])
 
+    # Compute derivative of Bernstein basis
+    dB = np.zeros((num_points, 4))
+    for j in range(4):
+        dB[:, j] = 3 * (bernstein_poly(j - 1, 2, u) - bernstein_poly(j, 2, u)) if 0 < j < 4 else (3 * (1 - u) ** 2 if j == 0 else 3 * u ** 2)
 
-# def newton_raphson_root_find(bezier, point, u):
+    # Vectorized curve and derivative evaluation
+    point_on_curve = B @ bezier
+    derivative_on_curve = dB @ bezier
 
-#     Q_u = bezier_point(3, bezier, u)
+    # Vectorized Newton-Raphson update
+    numerator = np.sum((point_on_curve - points) * derivative_on_curve, axis=1)
+    denominator = np.sum(derivative_on_curve ** 2, axis=1) + 1e-6
+    u_prime = u - numerator / denominator
 
-#     Q1 = 3.0 * (bezier[1:] - bezier[:-1])
-#     Q2 = 2.0 * (bezier[1:] - bezier[:-1])
+    # Clamp to [0, 1]
+    u_prime = np.clip(u_prime, 0.0, 1.0)
+    return u_prime
 
-#     Q1_u = bezier_point(2, Q1, u)
-#     Q2_u = bezier_point(1, Q2, u)
+def fit_cubic_lsqr(points, t_hat1, t_hat2, error):
 
-#     numerator = np.sum((Q_u - point) * Q1_u)
-#     denominator = np.sum(Q1_u * Q1_u + (Q_u - point) * Q2_u)
+    num_points = points.shape[0]
 
-#     out = np.where(denominator != 0, u - numerator / denominator, u)
-#     return out
+    if num_points == 2:
+        distance = np.linalg.norm(points[1] - points[0]) / 3.0
+        bezier = np.array([points[0], points[0] + t_hat1 * distance, points[1] + t_hat2 * distance, points[1]])
+        return [bezier]
 
+    # Initial parameterization using chord length
+    u = chord_length_parametrization(points)
+    bezier_curve = fit_segment(points, t_hat1, t_hat2, u)
 
-# def compute_max_error(bezier, points, u):
+    current_error_value = current_error(points, bezier_curve, u)
+    mid_index = np.argmax(current_error_value[1:-1]) + 1
 
-#     p = bezier_point(3, bezier, u)
+    if np.max(current_error_value) < error * 4:
+        for _ in range(4):
+            u_prime = nr_root_reparameterize(bezier_curve, points, current_error_value)
+            bezier_curve = fit_segment(points, t_hat1, t_hat2, u_prime)
+            current_error_value = current_error(points, bezier_curve, u_prime)
+            if np.max(current_error_value) < error:
+                return [bezier_curve]
 
-#     error = np.linalg.norm(p - points, axis=-1)
-#     split_point = np.argmax(error[1:-1]) + 1
-#     max_error = error[split_point]
+    t_hat_center = points[mid_index - 1] - points[mid_index + 1]
+    t_hat_center /= np.linalg.norm(t_hat_center) + 1e-6
+    left_curves = fit_cubic_lsqr(points[:mid_index + 1], t_hat1, t_hat_center, error)
+    right_curves = fit_cubic_lsqr(points[mid_index:], -t_hat_center, t_hat2, error)
+    return left_curves + right_curves
 
-#     # max_error = 0
-#     # split_point = len(points) // 2
+def fit_curve_lsqr(points, error):
+    # points must have shape (2, n)
+    # Convert points to a NumPy array
+    points = np.array(points)
+    num_points = points.shape[0]
 
-#     # for i in range(1, len(points) - 1):
-#     #     p = bezier_point(3, bezier, u[i])
+    t_hat1 = points[1, :] - points[0, :]
+    t_hat1 /= np.linalg.norm(t_hat1) + 1e-6
+    t_hat2 = points[-1, :] - points[-2, :]
+    t_hat2 /= np.linalg.norm(t_hat2) + 1e-6
 
-#     #     error = np.linalg.norm(p - points[i])
-#     #     if error > max_error:
-#     #         max_error = error
-#     #         split_point = i
-
-#     return max_error, split_point
-
-
-# def generate_bezier(points, u, t_hat1, t_hat2):
-
-#     A = np.zeros((len(u), 2, 2))
-
-#     A[:, 0, 0] = t_hat1[0] * (3 * u * (1.0 - u )**2)
-#     A[:, 0, 1] = t_hat1[1] * (3 * u**2 * (1.0 - u))
-#     A[:, 1, 0] = t_hat2[0] * (3 * u * (1.0 - u )**2)
-#     A[:, 1, 1] = t_hat2[1] * (3 * u**2 * (1.0 - u))
-
-
-#     C = np.zeros((2, 2))
-#     X = np.zeros((2,))
-
-#     C[0, 0] = np.sum(np.vecdot(A[:, 0], A[:, 0]))
-#     C[0, 1] = np.sum(np.vecdot(A[:, 0], A[:, 1]))
-#     C[1, 0] = C[0, 1]
-#     C[1, 1] = np.sum(np.vecdot(A[:, 1], A[:, 1]))
-
-#     u = u[:, np.newaxis]
-#     tmp = points - (points[0] * (1.0 - u)**3 + points[0] * 3 * u * (1.0 - u)**2 + points[-1] * 3 * u**2 * (1.0 - u) + points[-1] * u**3)
-
-#     X[0] = np.sum(np.vecdot(A[:, 0], tmp))
-#     X[1] = np.sum(np.vecdot(A[:, 1], tmp))
-
-
-#     det_C0_C1 = C[0, 0] * C[1, 1] - C[1, 0] * C[0, 1]
-#     det_C0_X  = C[0, 0] * X[1] - C[1, 0] * X[0]
-#     det_X_C1  = X[0] * C[1, 1] - X[1] * C[0, 1]
-
-#     alpha_l = 0.0 if det_C0_C1 == 0 else det_X_C1 / det_C0_C1
-#     alpha_r = 0.0 if det_C0_C1 == 0 else det_C0_X / det_C0_C1
-#     # alpha = np.array([alpha_l, alpha_r])
-
-#     # try:
-#     #     alpha = np.linalg.solve(C, X)
-
-#     # except np.linalg.LinAlgError:
-#     #     # If the system is singular, use heuristic
-#     #     alpha = np.array([1e-6, 1e-6])
-
-#     # if alpha is negative, use heuristic
-#     seg_length = np.linalg.norm(points[0] - points[-1])
-#     if alpha_l < 1e-6 * seg_length or alpha_r < 1e-6 * seg_length:
-#         bezier = np.array([points[0], points[0] + t_hat1 * seg_length, points[1] + t_hat2 * seg_length, points[1]])
-#         return bezier
-
-#     bezier = np.array([points[0], points[0] + t_hat1 * alpha_l, points[-1] + t_hat2 * alpha_r, points[-1]])
-
-#     return bezier
-
-
-# def chord_length_parametrization(points):
-#     # Compute the chord length for each segment
-#     lengths = np.linalg.norm(points[1:] - points[:-1], axis=1)
-#     # Compute the cumulative length
-#     cumulative_lengths = np.insert(np.cumsum(lengths), 0, 0)
-#     # Normalize to get parameters in [0, 1]
-#     return cumulative_lengths / cumulative_lengths[-1]
-
+    return fit_cubic_lsqr(points, t_hat1, t_hat2, error)
 
 def bezier_point(degree, bezier, t):
     # Compute the point on the Bezier curve at parameter t

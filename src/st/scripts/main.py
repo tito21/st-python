@@ -102,7 +102,7 @@ def get_brush(brush_type, width, brush_img_path, rng):
             brush_image = brush_image / 255.0
             brush = partial(img_brush, width=width, image=brush_image, jitter=0.1, rng=rng)
         case "line":
-            brush = partial(line_brush, width=width, num_segments=15)
+            brush = partial(line_brush, width=width, num_segments=15, rng=rng)
     return brush
 
 

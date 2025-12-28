@@ -121,7 +121,7 @@ def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1, rng=None
         ) | 0xFF000000
 
 
-def line_brush(context, curve, color, width=1.0, num_segments=10):
+def line_brush(context, curve, color, width=1.0, num_segments=10, rng=None):
     context.set_line_join(cairo.LineJoin.ROUND)
     context.set_line_width(0.75 * (width / num_segments))
     context.set_source_rgba(color[0], color[1], color[2], 1)

@@ -13,6 +13,7 @@ add_custom_command(
   COMMENT
     "Making ${CMAKE_CURRENT_BINARY_DIR}/utils.c from ${CMAKE_CURRENT_SOURCE_DIR}/src/st/utils.pyx"
   COMMAND Python::Interpreter -m cython
+          -a
           "${CMAKE_CURRENT_SOURCE_DIR}/src/st/utils.pyx" --output-file utils.c
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/st/utils.pyx
   VERBATIM)

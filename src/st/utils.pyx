@@ -4,25 +4,25 @@ import numpy as np
 
 from libc.math cimport floor
 
-cdef double fmax(double a, double b) noexcept:
+cdef double fmax(double a, double b) noexcept nogil:
     if a > b:
         return a
     else:
         return b
 
-cdef double fmin(double a, double b) noexcept:
+cdef double fmin(double a, double b) noexcept nogil:
     if a < b:
         return a
     else:
         return b
 
-cdef int min(int a, int b) noexcept:
+cdef int min(int a, int b) noexcept nogil:
     if a < b:
         return a
     else:
         return b
 
-cdef double clip(double value, double min_value, double max_value) noexcept:
+cdef double clip(double value, double min_value, double max_value) noexcept nogil:
     return fmax(fmin(value, max_value), min_value)
 
 

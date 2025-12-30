@@ -42,7 +42,7 @@ cdef class Segment:
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-cdef tuple[double, int] max_abs_dist(double[:, :] points, double[:] start, double[:] line_unit) noexcept:
+cdef tuple[double, int] max_abs_dist(double[:, :] points, double[:] start, double[:] line_unit) noexcept nogil:
     cdef int n = points.shape[0]
     cdef int i
     cdef int argmax = 0

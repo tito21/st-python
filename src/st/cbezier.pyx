@@ -221,11 +221,15 @@ cdef void generate_bezier(
 
 
     # if alpha is negative, use heuristic
-    seg_length = distance_point(points[0], points[-1])
+
+    cdef double[:] start, end
+    start = points[0]
+    end = points[points.shape[0]-1]
+    seg_length = distance_point(start, end)
     if alpha_l < 1e-6 * seg_length or alpha_r < 1e-6 * seg_length:
         get_bezier_control_points(
-            points[0],
-            points[-1],
+            start,
+            end,
             t_hat1,
             t_hat2,
             seg_length,
@@ -235,8 +239,8 @@ cdef void generate_bezier(
         return
 
     get_bezier_control_points(
-        points[0],
-        points[-1],
+        start,
+        end,
         t_hat1,
         t_hat2,
         alpha_l,
@@ -307,7 +311,7 @@ cdef void get_bezier_control_points(
     double alpha_l,
     double alpha_r,
     double[4][2] bezier
-) noexcept:
+) noexcept nogil:
 
     cdef int i
     for i in range(2):
@@ -319,7 +323,7 @@ cdef void get_bezier_control_points(
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-cdef double distance_point(double[:] p1, double[:] p2) noexcept:
+cdef double distance_point(double[:] p1, double[:] p2) noexcept nogil:
     return sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
 
@@ -336,7 +340,7 @@ cdef double[:] distance_array_array(double[:, :] points1, double[:, :] points2) 
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-cdef double sum_vecdot(double[:, :] a, double[:, :] b) noexcept:
+cdef double sum_vecdot(double[:, :] a, double[:, :] b) noexcept nogil:
     cdef int n = a.shape[0]
     cdef double total = 0.0
     cdef int i

@@ -6,17 +6,15 @@ cimport numpy as np
 
 np.import_array()
 
-from .utils cimport bilinear_interpolate_imp_double, bilinear_interpolate_imp_uint, max_args, min_args, clip
-# from .utils import bilinear_interpolate
+from .utils cimport bilinear_interpolate_imp_uint, max_args, min_args, clip
 
+cdef unsigned int ALPHA = 0xFF000000
+cdef unsigned int RED = 0x00FF0000
+cdef unsigned int GREEN = 0x0000FF00
+cdef unsigned int BLUE = 0x000000FF
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-cdef void affine_product(double x, double y, double[:, :] matrix, double[:] pos) noexcept nogil:
-    pos[0] = matrix[0, 0] * x + matrix[0, 1] * y + matrix[0, 2]
-    pos[1] = matrix[1, 0] * x + matrix[1, 1] * y + matrix[1, 2]
-
-
 cdef void place_brush_imp(unsigned int[:, :] dest, double[:, :, :] brush, double[:] pos, double[:] scale, double angle, unsigned int color):
 
 
@@ -73,17 +71,16 @@ cdef void place_brush_imp(unsigned int[:, :] dest, double[:, :, :] brush, double
     y_end = <unsigned int>clip(y_max, 0, dest.shape[0] - 1)
 
     cdef unsigned char r, g, b
-    r = (color & 0x00FF0000) >> 16
-    g = (color & 0x0000FF00) >> 8
-    b = (color & 0x000000FF)
+    r = (color & RED) >> 16
+    g = (color & GREEN) >> 8
+    b = (color & BLUE)
 
-    alpha = brush[..., 3:4]
-    brush_argb = np.zeros((brush.shape[0], brush.shape[1]), dtype=np.uint32)
+    cdef unsigned int[:, :] brush_argb = np.zeros((brush.shape[0], brush.shape[1]), dtype=np.uint32)
     cdef int i, j
     for i in range(brush.shape[0]):
         for j in range(brush.shape[1]):
             brush_argb[i, j] = (
-                  clip(<unsigned int>((1.0 - brush[i, j, 3]) * 255), 0, 255) << 24
+                  clip(<unsigned int>(255 * brush[i, j, 3]), 0, 255) << 24
                 | clip(<unsigned int>((1.0 - brush[i, j, 0]) * r), 0, 255) << 16
                 | clip(<unsigned int>((1.0 - brush[i, j, 1]) * g), 0, 255) << 8
                 | clip(<unsigned int>((1.0 - brush[i, j, 2]) * b), 0, 255)
@@ -93,7 +90,7 @@ cdef void place_brush_imp(unsigned int[:, :] dest, double[:, :, :] brush, double
 
     cdef double alpha_pos, inv_alpha_pos
     cdef unsigned int brush_argb_pos, region_pos
-    cdef unsigned char brush_r, brush_g, brush_b, region_r, region_g, region_b
+    cdef unsigned char brush_r, brush_g, brush_b, brush_a, region_r, region_g, region_b
     cdef double[:] pos_prime = np.empty(2, dtype=np.float64)
     cdef int x, y
     for x in range(region.shape[0]):
@@ -103,9 +100,6 @@ cdef void place_brush_imp(unsigned int[:, :] dest, double[:, :, :] brush, double
             pos_prime[1] = scale[0] * (sn * (x + x_start - pos[1]) + cn * (y + y_start - pos[0])) + brush.shape[0]/2
             if pos_prime[0] < 0 or pos_prime[0] >= brush.shape[1] or pos_prime[1] < 0 or pos_prime[1] >= brush.shape[0]:
                 continue
-
-            alpha_pos = bilinear_interpolate_imp_double(alpha, pos_prime[0], pos_prime[1])[0]
-            inv_alpha_pos = 1.0 - alpha_pos
 
             brush_argb_pos = bilinear_interpolate_imp_uint(brush_argb, pos_prime[0], pos_prime[1])
 
@@ -118,20 +112,23 @@ cdef void place_brush_imp(unsigned int[:, :] dest, double[:, :, :] brush, double
             # brush_g = 255
             # brush_b = 0
 
-            brush_r = (brush_argb_pos & 0x00FF0000) >> 16
-            brush_g = (brush_argb_pos & 0x0000FF00) >> 8
-            brush_b = (brush_argb_pos & 0x000000FF)
+            brush_a = (brush_argb_pos & ALPHA) >> 24
+            brush_r = (brush_argb_pos & RED) >> 16
+            brush_g = (brush_argb_pos & GREEN) >> 8
+            brush_b = (brush_argb_pos & BLUE)
 
+            region_r = (region_pos & RED) >> 16
+            region_g = (region_pos & GREEN) >> 8
+            region_b = (region_pos & BLUE)
 
-            region_r = (region_pos & 0x00FF0000) >> 16
-            region_g = (region_pos & 0x0000FF00) >> 8
-            region_b = (region_pos & 0x000000FF)
+            alpha_pos = <double>brush_a / 255.0
+            inv_alpha_pos = 1.0 - alpha_pos
 
             region[x, y] = (
                   clip(<unsigned int>((region_r * inv_alpha_pos) + (brush_r * alpha_pos)), 0, 255) << 16
                 | clip(<unsigned int>((region_g * inv_alpha_pos) + (brush_g * alpha_pos)), 0, 255) << 8
                 | clip(<unsigned int>((region_b * inv_alpha_pos) + (brush_b * alpha_pos)), 0, 255)
-                ) | 0xFF000000
+                ) | ALPHA
 
 
 def place_brush(np.ndarray[unsigned int, ndim=2] dest, np.ndarray[double, ndim=3] brush, np.ndarray[double, ndim=1] pos, np.ndarray[double, ndim=1] scale, double angle, unsigned int color):

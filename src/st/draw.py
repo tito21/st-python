@@ -4,7 +4,7 @@ import scipy.ndimage as ndi
 
 from .utils import bilinear_interpolate
 from .bezier import bezier_point
-
+from .img_brush import place_brush
 
 def simple_brush(context, curve, color, width=1.0):
     context.set_line_join(cairo.LineJoin.ROUND)
@@ -64,61 +64,65 @@ def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1, rng=None
         shape=(surface.get_height(), surface.get_width()), dtype=np.uint32, buffer=buf
     )
 
-    t = np.linspace(0, 1, 30)
+    t = np.linspace(0, 1, 15)
 
-    # Q1 = 3.0 * (curve[1:] - curve[:-1])
+    Q1 = 3.0 * (curve[1:] - curve[:-1])
 
     p = bezier_point(3, curve, t)
-    # d_p = bezier_point(2, Q1, t)
+    d_p = bezier_point(2, Q1, t)
 
-    # d_p /= np.linalg.norm(d_p, axis=1, keepdims=True) + 1e-6
-    # d_p *= 0.5 * width
+    d_p /= np.linalg.norm(d_p, axis=1, keepdims=True) + 1e-6
+    d_p *= 0.5 * width
     color_argb = (
         (color[0] * 255).astype(np.uint32) << 16
         | (color[1] * 255).astype(np.uint32) << 8
         | (color[2] * 255).astype(np.uint32)
     )
-    image = ndi.zoom(
-        image, (width / image.shape[0], width / image.shape[1], 1), order=0
-    )
+    # image = ndi.zoom(image, (width / image.shape[0], width / image.shape[1], 1), order=0)
+    factors = np.array([image.shape[0] / width, image.shape[1] / width ])
+    # factors = np.array([width, width])
+    h, w, _ = image.shape
     for i in range(len(t)):
         pi = p[i] + width * rng.uniform(-jitter, jitter, size=2)
-        # d_pi = d_p[i]
-        # angle = np.arctan2(d_pi[0], d_pi[1])
-        # image = ndi.rotate(image, np.degrees(angle), reshape=True)
-        h, w, _ = image.shape
-        x_start = int(pi[1] - w // 2)
-        y_start = int(pi[0] - h // 2)
-        x_end = x_start + w
-        y_end = y_start + h
-        if x_start < 0 or y_start < 0 or x_end > data.shape[1] or y_end > data.shape[0]:
-            continue
-        region = data[y_start:y_end, x_start:x_end]
-        alpha = image[..., 3]
-        inv_alpha = 1.0 - alpha
-        brush_argb = (
-            ((1 - image[:, :, 0]) * (color_argb & 0x00FF0000)).astype(np.uint32)
-            & 0x00FF0000
-            | ((1 - image[:, :, 1]) * (color_argb & 0x0000FF00)).astype(np.uint32)
-            & 0x0000FF00
-            | ((1 - image[:, :, 2]) * (color_argb & 0x000000FF)).astype(np.uint32)
-            & 0x000000FF
-        ) | 0xFF000000
+        d_pi = d_p[i]
+        angle = np.arctan2(d_pi[0], d_pi[1])
 
-        region[:] = (
-            (
-                (region & 0x00FF0000) * inv_alpha + (brush_argb & 0x00FF0000) * alpha
-            ).astype(np.uint32)
-            & 0x00FF0000
-            | (
-                (region & 0x0000FF00) * inv_alpha + (brush_argb & 0x0000FF00) * alpha
-            ).astype(np.uint32)
-            & 0x0000FF00
-            | (
-                (region & 0x000000FF) * inv_alpha + (brush_argb & 0x000000FF) * alpha
-            ).astype(np.uint32)
-            & 0x000000FF
-        ) | 0xFF000000
+        place_brush(data, image, pi, factors, angle, color_argb)
+
+        # image = ndi.rotate(image, np.degrees(angle), reshape=True)
+        # h, w, _ = image.shape
+        # x_start = int(pi[1] - w // 2)
+        # y_start = int(pi[0] - h // 2)
+        # x_end = x_start + w
+        # y_end = y_start + h
+        # if x_start < 0 or y_start < 0 or x_end > data.shape[1] or y_end > data.shape[0]:
+        #     continue
+        # region = data[y_start:y_end, x_start:x_end]
+        # alpha = image[..., 3]
+        # inv_alpha = 1.0 - alpha
+        # brush_argb = (
+        #     ((1 - image[:, :, 0]) * (color_argb & 0x00FF0000)).astype(np.uint32)
+        #     & 0x00FF0000
+        #     | ((1 - image[:, :, 1]) * (color_argb & 0x0000FF00)).astype(np.uint32)
+        #     & 0x0000FF00
+        #     | ((1 - image[:, :, 2]) * (color_argb & 0x000000FF)).astype(np.uint32)
+        #     & 0x000000FF
+        # ) | 0xFF000000
+
+        # region[:] = (
+        #     (
+        #         (region & 0x00FF0000) * inv_alpha + (brush_argb & 0x00FF0000) * alpha
+        #     ).astype(np.uint32)
+        #     & 0x00FF0000
+        #     | (
+        #         (region & 0x0000FF00) * inv_alpha + (brush_argb & 0x0000FF00) * alpha
+        #     ).astype(np.uint32)
+        #     & 0x0000FF00
+        #     | (
+        #         (region & 0x000000FF) * inv_alpha + (brush_argb & 0x000000FF) * alpha
+        #     ).astype(np.uint32)
+        #     & 0x000000FF
+        # ) | 0xFF000000
 
 
 def line_brush(context, curve, color, width=1.0, num_segments=10, rng=None):

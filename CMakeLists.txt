@@ -6,72 +6,21 @@ find_package(
   COMPONENTS Interpreter Development.Module
   REQUIRED)
 
+find_package(Cython MODULE REQUIRED VERSION 3.0)
+include(UseCython)
 
-# Generate utils.c from utils.pyx
-add_custom_command(
-  OUTPUT utils.c
-  COMMENT
-    "Making ${CMAKE_CURRENT_BINARY_DIR}/utils.c from ${CMAKE_CURRENT_SOURCE_DIR}/src/st/utils.pyx"
-  COMMAND Python::Interpreter -m cython
-          -a
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/st/utils.pyx" --output-file utils.c
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/st/utils.pyx
-  VERBATIM)
+cython_transpile("./src/st/utils.pyx" LANGUAGE C CYTHON_ARGS -a OUTPUT_VARIABLE utils_c)
+cython_transpile("./src/st/cbezier.pyx" LANGUAGE C CYTHON_ARGS -a OUTPUT_VARIABLE bezier_c)
+cython_transpile("./src/st/simplify_tract.pyx" LANGUAGE C CYTHON_ARGS -a OUTPUT_VARIABLE simplify_tract_c)
+cython_transpile("./src/st/img_brush.pyx" LANGUAGE C CYTHON_ARGS -a OUTPUT_VARIABLE img_brush_c)
 
-python_add_library(utils MODULE utils.c WITH_SOABI)
+python_add_library(utils MODULE "${utils_c}" WITH_SOABI)
+python_add_library(cbezier MODULE "${bezier_c}" WITH_SOABI)
+python_add_library(simplify_tract MODULE "${simplify_tract_c}" WITH_SOABI)
+python_add_library(img_brush MODULE "${img_brush_c}" WITH_SOABI)
 
-install(TARGETS utils DESTINATION st)
-
-
-# Get NumPy include directory from the same Python used to build:
-execute_process(
-  COMMAND "${Python_EXECUTABLE}" -c "import numpy; print(numpy.get_include())"
-  OUTPUT_VARIABLE NumPy_INCLUDE_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-# Generate cbezier.c from cbezier.pyx
-add_custom_command(
-  OUTPUT cbezier.c
-  COMMENT
-    "Making ${CMAKE_CURRENT_BINARY_DIR}/cbezier.c from ${CMAKE_CURRENT_SOURCE_DIR}/src/st/cbezier.pyx"
-  COMMAND Python::Interpreter -m cython
-          -a
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/st/cbezier.pyx" --output-file cbezier.c
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/st/cbezier.pyx
-  VERBATIM)
-
-python_add_library(cbezier MODULE cbezier.c WITH_SOABI)
-
-target_include_directories(
-  cbezier
-  PRIVATE
-    "${NumPy_INCLUDE_DIR}"
-    ${Python_INCLUDE_DIRS}
-)
-
-install(TARGETS cbezier DESTINATION st)
-
-
-# Generate simplify_tract.c from simplify_tract.pyx
-add_custom_command(
-  OUTPUT simplify_tract.c
-  COMMENT
-    "Making ${CMAKE_CURRENT_BINARY_DIR}/simplify_tract.c from ${CMAKE_CURRENT_SOURCE_DIR}/src/st/simplify_tract.pyx"
-  COMMAND Python::Interpreter -m cython
-          -a
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/st/simplify_tract.pyx" --output-file simplify_tract.c
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/st/simplify_tract.pyx
-  VERBATIM)
-
-python_add_library(simplify_tract MODULE simplify_tract.c WITH_SOABI)
-
-target_include_directories(
-  simplify_tract
-  PRIVATE
-    "${NumPy_INCLUDE_DIR}"
-    ${Python_INCLUDE_DIRS}
-)
-
-
-install(TARGETS simplify_tract DESTINATION st)
+find_package(Python COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+target_link_libraries(img_brush PRIVATE Python::NumPy)
+target_link_libraries(simplify_tract PRIVATE Python::NumPy)
+target_link_libraries(cbezier PRIVATE Python::NumPy)
+install(TARGETS utils cbezier simplify_tract img_brush DESTINATION st)

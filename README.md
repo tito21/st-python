@@ -15,7 +15,7 @@ For details, read the preprint [here](https://arxiv.org/abs/2511.00702v1).
 
 Install [uv](https://docs.astral.sh/uv/) and run:
 
-```bash
+```console
 uv run main.py INPUT_IMAGE OUTPUT_IMAGE [--params PARAMS_JSON] \
                                         [--orientation-vector {structural,gradient}] \
                                         [--rho RHO] [--sigma SIGMA] \
@@ -64,7 +64,7 @@ is reached.
 
 To reproduce the results in the preprint, run the following commands:
 
-```bash
+```console
 
 # Fig 1
 uv run main.py test-images/cubain.jpg out_cubain.png --params test-images/params.json --orientation-vector structural

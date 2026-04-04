@@ -13,10 +13,10 @@ dependencies = [
 ]
 
 [project.scripts]
-main = "st.scripts.main:main"
+main = "scripts.main:main"
 
 [build-system]
-requires = ["cython", "scikit-build-core>=0.11", "numpy>=2.0.0"]
+requires = ["cython", "scikit-build-core>=0.11", "cython-cmake", "numpy>=2.0.0"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]

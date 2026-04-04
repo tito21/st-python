@@ -84,10 +84,10 @@ cdef list[double[4][2]] fit_cubic_imp(
 cdef void newton_raphson_root_find(
     double[4][2] bezier,
     double[:, :] point,
-    cnp.ndarray[cnp.float64_t, ndim=1] u
+    double[:] u
 ) noexcept:
 
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] Q_u = np.array(bezier_point_c(3, bezier, u))
+    cdef double[:, :] Q_u = bezier_point_c(3, bezier, u)
 
     cdef double[3][2] Q1
     Q1[0][0] = 3.0 * (bezier[1][0] - bezier[0][0])
@@ -104,13 +104,21 @@ cdef void newton_raphson_root_find(
     Q2[2][0] = 2.0 * (bezier[3][0] - bezier[2][0])
     Q2[2][1] = 2.0 * (bezier[3][1] - bezier[2][1])
 
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] Q1_u = np.array(bezier_point_c(2, Q1, u))
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] Q2_u = np.array(bezier_point_c(1, Q2, u))
+    cdef double[:, :] Q1_u = bezier_point_c(2, Q1, u)
+    cdef double[:, :] Q2_u = bezier_point_c(1, Q2, u)
 
-    numerator = np.sum((Q_u - point) * Q1_u)
-    denominator = np.sum(Q1_u * Q1_u + (Q_u - point) * Q2_u)
+    cdef double numerator = 0.0
+    cdef double denominator = 0.0
 
-    u = np.where(denominator != 0, u - numerator / denominator, u)
+    cdef int i
+    for i in range(len(u)):
+        numerator += (Q_u[i, 0] - point[i, 0]) * Q1_u[i, 0] + (Q_u[i, 1] - point[i, 1]) * Q1_u[i, 1]
+        denominator += Q1_u[i, 0] * Q1_u[i, 0] + Q1_u[i, 1] * Q1_u[i, 1] + (Q_u[i, 0] - point[i, 0]) * Q2_u[i, 0] + (Q_u[i, 1] - point[i, 1]) * Q2_u[i, 1]
+
+    # numerator = np.sum((Q_u - point) * Q1_u)
+    # denominator = np.sum(Q1_u * Q1_u + (Q_u - point) * Q2_u)
+    for i in range(len(u)):
+        u[i] = u[i] - numerator / denominator if denominator != 0 else u[i]
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
@@ -136,25 +144,31 @@ cdef tuple[double, int] compute_max_error(
     return max_error, split_point
 
 
+@cython.boundscheck(False) # turn off bounds-checking for entire function
+@cython.wraparound(False)  # turn off negative index wrapping for entire function
 @cython.cdivision(True)    # enable C division semantics for entire function
 cdef void generate_bezier(
     double[:, :] points,
-    cnp.ndarray[cnp.float64_t, ndim=1] u,
+    double[:] u,
     double[2] t_hat1,
     double[2] t_hat2,
     double[4][2] bezier
 ) noexcept:
 
-    A = np.zeros((len(u), 2, 2))
+    cdef int num_points = len(u)
 
-    A[:, 0, 0] = t_hat1[0] * (3 * u * (1.0 - u )**2)
-    A[:, 0, 1] = t_hat1[1] * (3 * u**2 * (1.0 - u))
-    A[:, 1, 0] = t_hat2[0] * (3 * u * (1.0 - u )**2)
-    A[:, 1, 1] = t_hat2[1] * (3 * u**2 * (1.0 - u))
+    cdef double[:, :, :] A = np.zeros((len(u), 2, 2))
+
+    cdef int i
+    for i in range(num_points):
+        A[i, 0, 0] = t_hat1[0] * (3 * u[i] * (1.0 - u[i])**2)
+        A[i, 0, 1] = t_hat1[1] * (3 * u[i]**2 * (1.0 - u[i]))
+        A[i, 1, 0] = t_hat2[0] * (3 * u[i] * (1.0 - u[i])**2)
+        A[i, 1, 1] = t_hat2[1] * (3 * u[i]**2 * (1.0 - u[i]))
 
 
-    cdef double[2][2] C = np.zeros((2, 2))
-    cdef double[2] X = np.zeros((2,))
+    cdef double[2][2] C
+    cdef double[2] X
 
     # C[0, 0] = np.sum(np.vecdot(A[:, 0], A[:, 0]))
     # C[0, 1] = np.sum(np.vecdot(A[:, 0], A[:, 1]))
@@ -166,9 +180,15 @@ cdef void generate_bezier(
     C[1][0] = C[0][1]
     C[1][1] = sum_vecdot(A[:, 1], A[:, 1])
 
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] u_expanded = u[:, np.newaxis]
-    cdef cnp.ndarray[cnp.float64_t, ndim=2] points_np = np.array(points)
-    tmp = points_np - (points_np[0] * (1.0 - u_expanded)**3 + points_np[0] * 3 * u_expanded * (1.0 - u_expanded)**2 + points_np[-1] * 3 * u_expanded**2 * (1.0 - u_expanded) + points_np[-1] * u_expanded**3)
+    cdef double[:, :] tmp = np.zeros((num_points, 2), dtype=np.float64)
+
+    cdef double[:] first_point = points[0]
+    cdef double[:] last_point = points[points.shape[0]-1]
+
+    for i in range(num_points):
+        tmp[i, 0] = points[i, 0] - (first_point[0] * (1.0 - u[i])**3 + first_point[0] * 3 * u[i] * (1.0 - u[i])**2 + last_point[0] * 3 * u[i]**2 * (1.0 - u[i]) + last_point[0] * u[i]**3)
+        tmp[i, 1] = points[i, 1] - (first_point[1] * (1.0 - u[i])**3 + first_point[1] * 3 * u[i] * (1.0 - u[i])**2 + last_point[1] * 3 * u[i]**2 * (1.0 - u[i]) + last_point[1] * u[i]**3)
+
 
     X[0] = sum_vecdot(A[:, 0], tmp)
     X[1] = sum_vecdot(A[:, 1], tmp)
@@ -323,13 +343,13 @@ cdef void get_bezier_control_points(
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-cdef double distance_point(double[:] p1, double[:] p2) noexcept nogil:
+cdef inline double distance_point(double[:] p1, double[:] p2) noexcept nogil:
     return sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-cdef double[:] distance_array_array(double[:, :] points1, double[:, :] points2) noexcept:
+cdef inline double[:] distance_array_array(double[:, :] points1, double[:, :] points2) noexcept:
     cdef int n = points1.shape[0]
     cdef double[:] dists = np.empty(n, dtype=np.float64)
     cdef int i
@@ -340,7 +360,7 @@ cdef double[:] distance_array_array(double[:, :] points1, double[:, :] points2) 
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-cdef double sum_vecdot(double[:, :] a, double[:, :] b) noexcept nogil:
+cdef inline double sum_vecdot(double[:, :] a, double[:, :] b) noexcept nogil:
     cdef int n = a.shape[0]
     cdef double total = 0.0
     cdef int i

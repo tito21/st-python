@@ -11,6 +11,7 @@ import tqdm.auto as tqdm
 
 from st.draw import draw_tracts, simple_brush, angle_brush, img_brush, line_brush
 from st.tractography import *
+from st.ode_system import compute_tract as compute_tract_cython
 
 
 def parse_args():
@@ -142,7 +143,8 @@ def render_grid(
         #         image.shape[1] - grid_size // 2,
         #     ),
         # )
-        ode_system = ODESystem(orientation, valid_mask, mask_threshold)
+        # ode_system = ODESystem(orientation, valid_mask, mask_threshold)
+        # ode_system = ODESystemCython(orientation, valid_mask, mask_threshold)
         image_region = image[
             start_point[0] - grid_size // 2 : start_point[0] + grid_size // 2,
             start_point[1] - grid_size // 2 : start_point[1] + grid_size // 2,
@@ -183,8 +185,11 @@ def render_grid(
 
             # x0 = start_point[0] + grid_size // 2
             # y0 = start_point[1] + grid_size // 2
-            tract = compute_tract(
-                ode_system, (x0, y0), length_lines, min_length, tolerance=width
+            # tract = compute_tract(
+            #     ode_system, (x0, y0), length_lines, min_length, tolerance=width
+            # )
+            tract = compute_tract_cython(
+                orientation, valid_mask, mask_threshold, (x0, y0), length_lines, min_length, tolerance=width
             )
 
             draw_tracts([tract], image, context, brush)
@@ -229,7 +234,8 @@ def render_continuous(
         # x0 = rng.integers(0, image.shape[0])
         # y0 = rng.integers(0, image.shape[1])
 
-        ode_system = ODESystem(orientation, valid_mask, mask_threshold)
+        # ode_system = ODESystem(orientation, valid_mask, mask_threshold)
+        # ode_system = ODESystemCython(orientation, valid_mask, mask_threshold)
 
         target = np.ndarray(
             buffer=surface.get_data(),
@@ -240,8 +246,8 @@ def render_continuous(
 
         color_difference = np.linalg.norm(image - target, axis=-1)
         error = np.mean(color_difference)
-        tract = compute_tract(
-            ode_system, (x0, y0), length_lines, min_length, tolerance=width
+        tract = compute_tract_cython(
+            orientation, valid_mask, mask_threshold, (x0, y0), length_lines, min_length, tolerance=width
         )
         draw_tracts([tract], image, context, brush)
 
@@ -301,10 +307,10 @@ def main():
         print("Coherence computed.")
 
         if args.orientation_vector == "structural":
-            orientation = eigvecs[..., 0]
+            orientation = np.ascontiguousarray(eigvecs[..., 0])
             print("Using structural orientation vector.")
         else:
-            orientation = gradient_orientation
+            orientation = np.ascontiguousarray(gradient_orientation)
             print("Using gradient orientation vector.")
 
         match args.method:

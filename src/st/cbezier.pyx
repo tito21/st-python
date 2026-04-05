@@ -49,7 +49,7 @@ cdef list[double[4][2]] fit_cubic_imp(
         return [bezier]
 
 
-    cdef cnp.ndarray[cnp.float64_t, ndim=1] u = np.array(chord_length_parametrization(points))
+    cdef double[:] u = chord_length_parametrization(points)
     generate_bezier(points, u, t_hat1, t_hat2, bezier)
 
     cdef int split_point
@@ -126,7 +126,7 @@ cdef void newton_raphson_root_find(
 cdef tuple[double, int] compute_max_error(
     double[4][2] bezier,
     double[:, :] points,
-    cnp.ndarray[cnp.float64_t, ndim=1] u
+    double[:] u
 ) noexcept:
 
     cdef double[:, :] p = bezier_point_c(3, bezier, u)

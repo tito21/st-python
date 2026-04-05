@@ -6,10 +6,9 @@ from scipy.ndimage import gaussian_filter
 from scipy.integrate import solve_ivp
 from scipy.interpolate import RegularGridInterpolator
 
-from .bezier import fit_curve, fit_curve_lsqr
+from .bezier import fit_curve
 from .utils import bilinear_interpolate
 from .simplify_tract import simplify_tract
-
 
 def compute_structural_tensor(image, rho=1.0, sigma=1.0):
     # Compute the gradients
@@ -85,13 +84,13 @@ def coherence(eigenvalues):
     coherence = (lambda_diff / lambda_sum) ** 2
     coherence[lambda_sum == 0] = 0
 
-    return coherence
+    return np.ascontiguousarray(coherence)
 
 
 class ODESystem:
 
     def __init__(self, orientation, stopping, stopping_threshold):
-        x, y = np.arange(orientation.shape[0]), np.arange(orientation.shape[1])
+        # x, y = np.arange(orientation.shape[0]), np.arange(orientation.shape[1])
 
         # self.orientation_interpolated = RegularGridInterpolator(
         #     (x, y), orientation, method="linear", bounds_error=False, fill_value=0
@@ -172,7 +171,7 @@ def compute_tract(ode_system, starting_point, max_length, min_length=1.0, tolera
     )
     # sol = RK4(ode_system.f, [0, max_length], starting_point, events=events, dt = 1.0)
     tract = simplify_tract(sol.y.T, tolerance=1.0)
-    if len(tract) < 4 or np.linalg.norm(sol.t[-1]) < min_length:
+    if len(tract) < 4 or sol.t[-1] < min_length:
         return []
     bezier = fit_curve(tract, error=tolerance * 0.05)
     if np.any(np.isnan(bezier)):

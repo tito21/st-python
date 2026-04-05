@@ -13,6 +13,7 @@ cdef unsigned int RED = 0x00FF0000
 cdef unsigned int GREEN = 0x0000FF00
 cdef unsigned int BLUE = 0x000000FF
 
+@ cython.cdivision(True)    # enable C division semantics for entire function
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 cdef void place_brush_imp(unsigned int[:, :] dest, double[:, :, :] brush, double[:] pos, double[:] scale, double angle, unsigned int color):

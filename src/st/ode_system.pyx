@@ -1,4 +1,5 @@
 from libc.math cimport sqrt, fmin, fmax, fabs
+from libc.stdlib cimport malloc, free
 
 from cython.view cimport array as cvarray
 import cython
@@ -10,8 +11,8 @@ from .bezier import fit_curve
 from .utils cimport bilinear_interpolate_imp_double
 from .simplify_tract import simplify_tract
 
-ctypedef void(*f_ptr)(double, double[:], double[:], void* data) noexcept
-ctypedef int(*event_ptr)(double, double[:], void* data)
+ctypedef void(*f_ptr)(double, double[:], double[:], void* data) noexcept nogil
+ctypedef int(*event_ptr)(double, double[:], void* data) noexcept nogil
 
 cdef struct OdeData:
     double* orientation
@@ -24,7 +25,7 @@ cdef struct OdeData:
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 @cython.cdivision(True)    # enable C division semantics for entire function
-cdef inline double norm(double[:] y) noexcept:
+cdef inline double norm(double[:] y) noexcept nogil:
     cdef double result = 0.0
     for i in range(y.shape[0]):
         result += y[i] ** 2
@@ -34,7 +35,7 @@ cdef inline double norm(double[:] y) noexcept:
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 @cython.cdivision(True)    # enable C division semantics for entire function
-cdef inline double norm_inf(double[:] y) noexcept:
+cdef inline double norm_inf(double[:] y) noexcept nogil:
     cdef double result = 0.0
     for i in range(y.shape[0]):
         result = fmax(result, fabs(y[i]))
@@ -44,13 +45,13 @@ cdef inline double norm_inf(double[:] y) noexcept:
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 @cython.cdivision(True)    # enable C division semantics for entire function
-cdef void f(double t, double[:] y, double[:] out, void* data) noexcept:
+cdef void f(double t, double[:] y, double[:] out, void* data) noexcept nogil:
     cdef OdeData* ode_data = <OdeData*>data
-    cdef double[:, :, ::1] orientation = <double[:ode_data.shape[0], :ode_data.shape[1], :2]>ode_data.orientation
+    # cdef double[:, :, ::1] orientation = <double[:ode_data.shape[0], :ode_data.shape[1], :2]>ode_data.orientation
     # y is a 2D vector [x, y]
     # Compute the derivative using the orientation
-    # vector = self.orientation_interpolated(y)[0]
-    cdef double[:] vector = bilinear_interpolate_imp_double(orientation, y[0], y[1])
+    cdef double[2] vector
+    bilinear_interpolate_imp_double(ode_data.orientation, y[0], y[1], ode_data.shape[0], ode_data.shape[1], 2, vector)
     out[0] = vector[0]
     out[1] = vector[1]
     cdef double dir = out[0] * ode_data.last_out[0] + out[1] * ode_data.last_out[1]
@@ -60,25 +61,25 @@ cdef void f(double t, double[:] y, double[:] out, void* data) noexcept:
     ode_data.last_out[0] = out[0]
     ode_data.last_out[1] = out[1]
 
-
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 @cython.cdivision(True)    # enable C division semantics for entire function
-cdef int stopping_condition(double t, double[:] y, void* data):
+cdef int stopping_condition(double t, double[:] y, void* data) noexcept nogil:
     cdef OdeData* ode_data = <OdeData*>data
     # cdef cvarray stopping = cvarray(shape=(ode_data.shape[0], ode_data.shape[1], 1), itemsize=sizeof(double), format="<d", allocate_buffer=False)
     # stopping.data = <char *>ode_data.stopping
-    cdef double[:, :, ::1] stopping = <double[:ode_data.shape[0], :ode_data.shape[1], :1]>ode_data.stopping
+    # cdef double[:, :, ::1] stopping = <double[:ode_data.shape[0], :ode_data.shape[1], :1]>ode_data.stopping
     # Check if the stopping condition is met
-    if bilinear_interpolate_imp_double(stopping, y[0], y[1])[0] < ode_data.stopping_threshold:
-        # if self.stopping_interpolated(y) < self.stopping_threshold:
+    cdef double[1] stopping_value
+    bilinear_interpolate_imp_double(ode_data.stopping, y[0], y[1], ode_data.shape[0], ode_data.shape[1], 1, stopping_value)
+    if stopping_value[0] < ode_data.stopping_threshold:
         return 0
     return 1
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 @cython.cdivision(True)    # enable C division semantics for entire function
-cdef int out_of_bounds_condition(double t, double[:] y, void* data):
+cdef int out_of_bounds_condition(double t, double[:] y, void* data) noexcept nogil:
     cdef OdeData* ode_data = <OdeData*>data
     if y[0] < 0 or y[0] > ode_data.shape[0] or y[1] < 0 or y[1] > ode_data.shape[1]:
         return 0
@@ -88,7 +89,7 @@ cdef int out_of_bounds_condition(double t, double[:] y, void* data):
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 @cython.cdivision(True)    # enable C division semantics for entire function
-cdef RK23_step(f_ptr f, double t, double[:] y, void* data, double h, double[:] err, double[:] k1, double[:] k2, double[:] k3, double[:] k4, double[:] y_in) noexcept:
+cdef void RK23_step(f_ptr f, double t, double[:] y, void* data, double h, double[:] err, double[:] k1, double[:] k2, double[:] k3, double[:] k4, double[:] y_in) noexcept nogil:
     """
     We assume that k1 is already computed as f(t, y, k1) before calling this function. This allows us to reuse the k1 array for the next step, reducing function calls.
     """
@@ -132,7 +133,6 @@ cdef solve_ivp(f_ptr func, double[:] t_span, double[:] y0, event_ptr *events, in
     for i in range(n):
         y[i] = y0[i]
     func(t, y, k1, data)
-
 
     while t < t_end:
         if t + h > t_end:

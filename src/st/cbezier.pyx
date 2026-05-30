@@ -21,7 +21,7 @@ def fit_cubic(
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-@ cython.cdivision(True)    # enable C division semantics for entire function
+@cython.cdivision(True)    # enable C division semantics for entire function
 cdef list[double[4][2]] fit_cubic_imp(
     double[:, :] points,
     double[2] t_hat1,
@@ -122,7 +122,7 @@ cdef void newton_raphson_root_find(
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-@ cython.cdivision(True)    # enable C division semantics for entire function
+@cython.cdivision(True)    # enable C division semantics for entire function
 cdef tuple[double, int] compute_max_error(
     double[4][2] bezier,
     double[:, :] points,
@@ -273,7 +273,7 @@ cdef void generate_bezier(
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-@ cython.cdivision(True)    # enable C division semantics for entire function
+@cython.cdivision(True)    # enable C division semantics for entire function
 cdef double[:] chord_length_parametrization(double[:, :] points) noexcept:
     # Compute the chord length for each segment
     cdef double[:] lengths = distance_array_array(points[1:], points[:points.shape[0]-1])

@@ -10,6 +10,7 @@ dependencies = [
     "scikit-image>=0.25.2",
     "tqdm>=4.67.1",
     "numpy>=2.0.0",
+    "joblib>=1.5.3",
 ]
 
 [project.scripts]
@@ -34,5 +35,6 @@ package = true
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.3",
     "snakeviz>=2.2.2",
 ]

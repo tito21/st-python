@@ -89,41 +89,6 @@ def img_brush(context, curve, color, width=1.0, image=None, jitter=0.1, rng=None
 
         place_brush(data, image, pi, factors, angle, color_argb)
 
-        # image = ndi.rotate(image, np.degrees(angle), reshape=True)
-        # h, w, _ = image.shape
-        # x_start = int(pi[1] - w // 2)
-        # y_start = int(pi[0] - h // 2)
-        # x_end = x_start + w
-        # y_end = y_start + h
-        # if x_start < 0 or y_start < 0 or x_end > data.shape[1] or y_end > data.shape[0]:
-        #     continue
-        # region = data[y_start:y_end, x_start:x_end]
-        # alpha = image[..., 3]
-        # inv_alpha = 1.0 - alpha
-        # brush_argb = (
-        #     ((1 - image[:, :, 0]) * (color_argb & 0x00FF0000)).astype(np.uint32)
-        #     & 0x00FF0000
-        #     | ((1 - image[:, :, 1]) * (color_argb & 0x0000FF00)).astype(np.uint32)
-        #     & 0x0000FF00
-        #     | ((1 - image[:, :, 2]) * (color_argb & 0x000000FF)).astype(np.uint32)
-        #     & 0x000000FF
-        # ) | 0xFF000000
-
-        # region[:] = (
-        #     (
-        #         (region & 0x00FF0000) * inv_alpha + (brush_argb & 0x00FF0000) * alpha
-        #     ).astype(np.uint32)
-        #     & 0x00FF0000
-        #     | (
-        #         (region & 0x0000FF00) * inv_alpha + (brush_argb & 0x0000FF00) * alpha
-        #     ).astype(np.uint32)
-        #     & 0x0000FF00
-        #     | (
-        #         (region & 0x000000FF) * inv_alpha + (brush_argb & 0x000000FF) * alpha
-        #     ).astype(np.uint32)
-        #     & 0x000000FF
-        # ) | 0xFF000000
-
 
 def line_brush(context, curve, color, width=1.0, num_segments=10, rng=None):
     context.set_line_join(cairo.LineJoin.ROUND)

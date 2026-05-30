@@ -1,9 +1,9 @@
 
-cdef double[:] bilinear_interpolate_imp_double(double[:, :, :] image, double x, double y)
+cdef void bilinear_interpolate_imp_double(double* image, double x, double y, Py_ssize_t n, Py_ssize_t m, Py_ssize_t l, double* result) noexcept nogil
 
-cdef double[:] bilinear_interpolate_imp_char(unsigned char[:, :, :] image, double x, double y)
+cdef void bilinear_interpolate_imp_char(unsigned char* image, double x, double y, Py_ssize_t n, Py_ssize_t m, Py_ssize_t l, double* result) noexcept nogil
 
-cdef unsigned int bilinear_interpolate_imp_uint(unsigned int[:, :] image, double x, double y)
+cdef void bilinear_interpolate_imp_uint(unsigned int* image, double x, double y, Py_ssize_t n, Py_ssize_t m, unsigned int* pixel_value) noexcept nogil
 
 cdef fused dtype:
     int

@@ -2,12 +2,14 @@ import pathlib
 import argparse
 import json
 from functools import partial
+import timeit
 
 import numpy as np
 import skimage.io as io
 from skimage.filters import gaussian
 import cairo
 import tqdm.auto as tqdm
+from joblib import Parallel, delayed, cpu_count
 
 from st.draw import draw_tracts, simple_brush, angle_brush, img_brush, line_brush
 from st.tractography import *
@@ -107,92 +109,40 @@ def get_brush(brush_type, width, brush_img_path, rng):
     return brush
 
 
+def render_batch_parrallel(start_points, image, context, brush, orientation, valid_mask, mask_threshold, length_lines, min_length, tolerance):
+    def calc_tract(s):
+        return compute_tract_cython(np.copy(orientation), np.copy(valid_mask), mask_threshold, s, length_lines, min_length, tolerance=tolerance)
+
+    tracts = Parallel(n_jobs=-1)(delayed(calc_tract)(s) for s in start_points)
+    draw_tracts(tracts, image, context, brush)
+
+
 def render_grid(
     context,
-    surface,
     image,
     orientation,
     valid_mask,
     mask_threshold=0.5,
-    color_difference_threshold=100,
     grid_size=20,
     length_lines=1000.0,
     min_length=1.0,
     width=2.0,
     brush=None,
+    batch_size=cpu_count(),
     rng=None,
 ):
     start_points = [
-        (i, j)
+        (i + grid_size // 2, j + grid_size // 2)
         for i in range(0, image.shape[0], grid_size)
         for j in range(0, image.shape[1], grid_size)
     ]
 
     rng.shuffle(start_points)
-
-    for start_point in tqdm.tqdm(start_points):
-        # start_point = (
-        #     np.clip(
-        #         start_point[0] + rng.integers(0, grid_size // 2),
-        #         grid_size // 2,
-        #         image.shape[0] - grid_size // 2,
-        #     ),
-        #     np.clip(
-        #         start_point[1] + rng.integers(0, grid_size // 2),
-        #         grid_size // 2,
-        #         image.shape[1] - grid_size // 2,
-        #     ),
-        # )
-        # ode_system = ODESystem(orientation, valid_mask, mask_threshold)
-        # ode_system = ODESystemCython(orientation, valid_mask, mask_threshold)
-        image_region = image[
-            start_point[0] - grid_size // 2 : start_point[0] + grid_size // 2,
-            start_point[1] - grid_size // 2 : start_point[1] + grid_size // 2,
-        ]
-        target_region = np.ndarray(
-            buffer=surface.get_data(),
-            shape=(image.shape[0], image.shape[1]),
-            dtype=np.uint32,
-        )[
-            start_point[0] - grid_size // 2 : start_point[0] + grid_size // 2,
-            start_point[1] - grid_size // 2 : start_point[1] + grid_size // 2,
-        ]
-        target_region = np.stack(
-            [
-                ((target_region >> 16) & 0xFF),
-                ((target_region >> 8) & 0xFF),
-                (target_region & 0xFF),
-            ],
-            axis=-1,
-        ).astype(np.uint8)
-
-        color_difference = np.mean(
-            np.linalg.norm(image_region - target_region, axis=-1)
-        )
-        if color_difference > color_difference_threshold:
-            max_index = np.argmax(
-                valid_mask[
-                    start_point[0] : start_point[0] + grid_size,
-                    start_point[1] : start_point[1] + grid_size,
-                ]
-            )
-            pos_x, pos_y = np.unravel_index(max_index, (grid_size, grid_size))
-            x0 = start_point[0] + pos_x
-            y0 = start_point[1] + pos_y
-
-            # x0 = np.clip(start_point[0] + rng.integers(-grid_size // 2, grid_size // 2), 0, image.shape[0] - grid_size)
-            # y0 = np.clip(start_point[1] + rng.integers(-grid_size // 2, grid_size // 2), 0, image.shape[1] - grid_size)
-
-            # x0 = start_point[0] + grid_size // 2
-            # y0 = start_point[1] + grid_size // 2
-            # tract = compute_tract(
-            #     ode_system, (x0, y0), length_lines, min_length, tolerance=width
-            # )
-            tract = compute_tract_cython(
-                orientation, valid_mask, mask_threshold, (x0, y0), length_lines, min_length, tolerance=width
-            )
-
-            draw_tracts([tract], image, context, brush)
+    bar = tqdm.tqdm(total=len(start_points))
+    for i in range(0, len(start_points), batch_size):
+        start_point_batch = start_points[i:i+batch_size]
+        render_batch_parrallel(start_point_batch, image, context, brush, orientation, valid_mask, mask_threshold, length_lines, min_length, width)
+        bar.update(len(start_point_batch))
 
 
 def render_continuous(
@@ -208,6 +158,7 @@ def render_continuous(
     min_length=1.0,
     width=2.0,
     brush=None,
+    batch_size=cpu_count(),
     rng=None,
 ):
 
@@ -225,17 +176,10 @@ def render_continuous(
     bar = tqdm.tqdm(total=num_lines)
     while lines_drawn < num_lines and error > color_difference_threshold:
 
-        index = rng.choice(color_difference.size, p=color_difference.flatten() / np.sum(color_difference))
-        x0, y0 = np.unravel_index(index, color_difference.shape)
+        indices = rng.choice(color_difference.size, size=batch_size, replace=False, p=color_difference.flatten() / np.sum(color_difference))
+        start_points = [np.unravel_index(index, color_difference.shape) for index in indices]
 
-        # max_index = np.unravel_index(np.argmax(color_difference), color_difference.shape)
-        # x0, y0 = max_index
-
-        # x0 = rng.integers(0, image.shape[0])
-        # y0 = rng.integers(0, image.shape[1])
-
-        # ode_system = ODESystem(orientation, valid_mask, mask_threshold)
-        # ode_system = ODESystemCython(orientation, valid_mask, mask_threshold)
+        render_batch_parrallel(start_points, image, context, brush, orientation, valid_mask, mask_threshold, length_lines, min_length, width)
 
         target = np.ndarray(
             buffer=surface.get_data(),
@@ -246,15 +190,12 @@ def render_continuous(
 
         color_difference = np.linalg.norm(image - target, axis=-1)
         error = np.mean(color_difference)
-        tract = compute_tract_cython(
-            orientation, valid_mask, mask_threshold, (x0, y0), length_lines, min_length, tolerance=width
-        )
-        draw_tracts([tract], image, context, brush)
 
-        lines_drawn += 1
-        bar.update(1)
+        lines_drawn += len(start_points)
+        bar.update(len(start_points))
         bar.set_description(f"Lines drawn: {lines_drawn}, Color diff: {error:.2f}")
     bar.close()
+
 
 
 def main():
@@ -317,12 +258,10 @@ def main():
             case "grid":
                 render_grid(
                     context,
-                    surface,
                     image,
                     orientation,
                     coh,
                     mask_threshold=0.5,
-                    color_difference_threshold=setting.get("color_threshold", 50),
                     grid_size=int(setting["width"] / 2),
                     length_lines=setting["length_lines"],
                     min_length=setting["min_length"],

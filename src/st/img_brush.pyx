@@ -102,7 +102,7 @@ cdef void place_brush_imp(unsigned int[:, :] dest, double[:, :, :] brush, double
             if pos_prime[0] < 0 or pos_prime[0] >= brush.shape[1] or pos_prime[1] < 0 or pos_prime[1] >= brush.shape[0]:
                 continue
 
-            brush_argb_pos = bilinear_interpolate_imp_uint(brush_argb, pos_prime[0], pos_prime[1])
+            bilinear_interpolate_imp_uint(&brush_argb[0, 0], pos_prime[0], pos_prime[1], brush_argb.shape[0], brush_argb.shape[1], &brush_argb_pos)
 
             region_pos = region[x, y]
 

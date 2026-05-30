@@ -86,6 +86,7 @@ bash make_montage.sh # MacOS/Linux (requires ImageMagick)
 # TODO
 
 - [x] Use np.random.Generator for random numbers (and set seed for reproducibility)
-- [ ] Parallelize line drawing
+- [ ] Parallelize line drawing. Process in batches
 - [ ] Normalize parameters to be independent of image size
+- [ ] Improve colour selection and sampling of the Bézier curve
 - [ ] Add tests
